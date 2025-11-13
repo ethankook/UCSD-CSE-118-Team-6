@@ -261,4 +261,4 @@ Total duration: **3–4 weeks**
 
 - “Documentation Home | Alexa Voice Service.” Amazon (Alexa), developer documentation.  
 
-Content adapted from the original **CSE118 Project Proposal**. :contentReference[oaicite:0]{index=0}
+Content adapted from the original **CSE118 Project Proposal**
