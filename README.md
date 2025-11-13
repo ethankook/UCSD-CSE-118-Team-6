@@ -1,4 +1,3 @@
-# UCSD-CSE-118-Team-6
 # Translation Machine
 
 A ubiquitous computing project that integrates an AR headset (Meta Quest 2) and a voice-based smart assistant (Amazon Echo Dot) to enable **bidirectional, real-time translation** in multi-language environments such as classrooms and workplaces.
@@ -262,4 +261,4 @@ Total duration: **3–4 weeks**
 
 - “Documentation Home | Alexa Voice Service.” Amazon (Alexa), developer documentation.  
 
-Content adapted from the original **CSE118 Project Proposal**
+Content adapted from the original **CSE118 Project Proposal**. :contentReference[oaicite:0]{index=0}
