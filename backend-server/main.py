@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 from typing import List, Dict, Optional
 import json
+import boto3
 
 
 # handles client connections and their preferred languages
@@ -98,14 +99,24 @@ class ConnectionManager:
                 self.add_to_lang_group(client, client.preferred_lang)
                 print(f"Client language updated to {new_lang}")
 
-    # dummy translation function
     def translate_message(self, message: str, target_lang: str, source_lang: str) -> str:
         """
-        Placeholder for real translation (e.g., AWS Translate).
+        Use AWS Translate to translate the message from source_lang to target_lang.
+        If source and target are the same, just return the original.
         """
         if target_lang == source_lang:
             return message
-        return f"[{target_lang}] {message}"
+
+        translate_client = boto3.client("translate")
+
+        response = translate_client.translate_text(
+            Text=message,
+            SourceLanguageCode=source_lang,
+            TargetLanguageCode=target_lang,
+        )
+
+        return response["TranslatedText"]
+
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """
