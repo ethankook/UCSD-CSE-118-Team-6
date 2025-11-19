@@ -1,0 +1,5 @@
+C:/Users/zil094/UCSD-CSE-118-Team-6/Unity/.utmp/RelWithDebInfo/29674nto/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/zil094/UCSD-CSE-118-Team-6/Unity/.utmp/RelWithDebInfo/29674nto/arm64-v8a/CMakeFiles/rebuild_cache.dir
+C:/Users/zil094/UCSD-CSE-118-Team-6/Unity/.utmp/RelWithDebInfo/29674nto/arm64-v8a/GameActivity/CMakeFiles/game.dir
+C:/Users/zil094/UCSD-CSE-118-Team-6/Unity/.utmp/RelWithDebInfo/29674nto/arm64-v8a/GameActivity/CMakeFiles/edit_cache.dir
+C:/Users/zil094/UCSD-CSE-118-Team-6/Unity/.utmp/RelWithDebInfo/29674nto/arm64-v8a/GameActivity/CMakeFiles/rebuild_cache.dir
