@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+import uvicorn
 from typing import List, Dict, Optional
 import json
 import boto3
@@ -190,3 +191,7 @@ async def subtitle(
 @app.get("/")
 async def root():
     return {"message": "server running"}
+
+if __name__ == "__main__":
+   uvicorn.run(app="main:app", port=6543, reload=True)
+   
