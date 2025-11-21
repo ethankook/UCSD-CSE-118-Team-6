@@ -23,7 +23,7 @@ MonoBehaviour:
   showInfoLog: 0
   showWarningLog: 1
   showErrorLog: 1
-  collapsedIdenticalLogEntries: 0
+  collapsedIdenticalLogEntries: 1
   maximumNumberOfLogEntries: 1000
   panelDistance: 1
   createEventSystem: 1
