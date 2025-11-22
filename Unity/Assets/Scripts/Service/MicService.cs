@@ -1,92 +1,192 @@
 using UnityEngine;
-using UnityEngine.Android; // Required for Quest Permissions
+using UnityEngine.Android; 
 using System.Collections;
 using System.Threading.Tasks;
-using Whisper; // Assuming you are using the Whisper.unity package
+using Whisper;
+using TMPro;
+using UnityEngine.UI;
 
 public class MicService : MonoBehaviour
 {
-    static MicService instance;
+    public static MicService instance;
+
     [Header("Dependencies")]
-    public WhisperManager whisperManager; // Drag your WhisperManager prefab here
+    public WhisperManager whisperManager; 
 
     [Header("Settings")]
-    public int maxRecordingLength = 20; // Seconds
-    public int sampleRate = 16000; // Whisper prefers 16k
+    public int maxRecordingLength = 20; 
+    public int sampleRate = 16000; 
 
     private AudioClip recordingClip;
-    private string micDevice;
+    private string micDevice;   
+    
+    // State Flags
     private bool isRecording = false;
+    private bool isProcessing = false; 
+
+    [Header("UI Elements")]
+    [SerializeField] private Button RecordingButton; // Assign your UI Button here to auto-add listener
+
+    [SerializeField] private TextMeshProUGUI RecordingButtonText;
+    [SerializeField] private Image RecordingButtonBackground;
+    
+    // Colors
+    private Color colorIdle = Color.cyan;
+    private Color colorRecording = Color.red;
+    private Color colorProcessing = Color.yellow;
 
     void Awake()
     {
-        instance = this;
+        if (instance == null) instance = this;
+        else Destroy(gameObject);
+
+        // Ensure model is initialized if not done in Inspector
+        if(!whisperManager.IsLoaded) 
+            whisperManager.InitModel(); 
+        
+        // Optional: Auto-hook button
+        if (RecordingButton != null)
+            RecordingButton.onClick.AddListener(OnRecordingButtonClick);
     }
-    private void Start()
+
+    private async void Start()
     {
-        // 1. CRITICAL: Request Microphone Permission on Quest/Android
+        // Permissions Logic
         #if UNITY_ANDROID
         if (!Permission.HasUserAuthorizedPermission(Permission.Microphone))
-        {
             Permission.RequestUserPermission(Permission.Microphone);
-        }
         #endif
 
-        // Get the first available microphone
         if (Microphone.devices.Length > 0)
             micDevice = Microphone.devices[0];
         else
-            Debug.LogError("No Microphone Detected!");
+            LogService.Log("MicService: No microphone found!");
+
+        if (!whisperManager.IsLoaded)
+        {
+            LogService.Log("MicService: Initializing Whisper Model...");
+            await whisperManager.InitModel();
+        }
+        
+        LogService.Log("MicService: Whisper Ready!");
+        
+        // Set Initial UI State
+        UpdateUIState(false, false);
     }
 
-    // --- API Methods ---
-
-    public static bool StartRecording()
+    private void Update()
     {
-        if (string.IsNullOrEmpty(instance.micDevice)) return false;
-        if (instance.isRecording) return false;
-
-        // Start Unity Microphone (Loop = false to stop auto-overwrite)
-        instance.recordingClip = Microphone.Start(instance.micDevice, false, instance.maxRecordingLength, instance.sampleRate);
-        instance.isRecording = true;
-        Debug.Log("Recording Started...");
-        return true;
+        // Safety: If recording hits max length, auto-stop to prevent silence
+        if (isRecording && Microphone.IsRecording(micDevice) == false)
+        {
+            // The clip finished (reached max seconds)
+             _ = StopRecordingAndTranscribe(); // Fire and forget
+        }
     }
 
-    public static AudioClip StopRecording()
+    // --- The Button Entry Point ---
+    [ContextMenu("Toggle Recording")]
+    public void OnRecordingButtonClick()
     {
-        if (!instance.isRecording) return null;
+        // Prevent clicking while AI is thinking
+        if (isProcessing) return; 
 
-        int position = Microphone.GetPosition(instance.micDevice);
-        Microphone.End(instance.micDevice);
-        instance.isRecording = false;
-
-        if (instance.recordingClip == null) return null;
-
-        // Critical: Trim the AudioClip to the actual spoken length
-        // If we don't do this, Whisper processes 20 seconds of empty silence.
-        AudioClip trimmedClip = instance.TrimSilence(instance.recordingClip, position);
-        
-        Debug.Log($"Recording Stopped. Raw: {instance.maxRecordingLength}s, Trimmed: {trimmedClip.length}s");
-        return trimmedClip;
+        if (!isRecording)
+        {
+            StartRecording();
+        }
+        else
+        {
+            // We must use a fire-and-forget async call here for the button void
+            _ = StopRecordingAndTranscribe(); 
+        }
     }
 
-    public static async Task<string> TranscribeAudio(AudioClip clip)
-    {
-        if (clip == null || instance.whisperManager == null) return "Error: Missing Clip or Whisper Manager";
+    // --- Core Logic ---
 
-        Debug.Log("Starting Local Transcription...");
+    public void StartRecording()
+    {
+        if (string.IsNullOrEmpty(micDevice)) return;
+        if (isRecording || isProcessing) return;
+
+        // Start Unity Microphone
+        recordingClip = Microphone.Start(micDevice, false, maxRecordingLength, sampleRate);
+        isRecording = true;
+
+        UpdateUIState(true, false);
+        LogService.Log("MicService: Recording Started...");
+    }
+
+    // Changed from Task<AudioClip> to Task so we can await the whole process
+    public async Task StopRecordingAndTranscribe()
+    {
+        if (!isRecording) return;
+
+        // 1. Capture current position
+        int position = Microphone.GetPosition(micDevice);
+        Microphone.End(micDevice);
+        isRecording = false;
+
+        // 2. Update UI to "Thinking" state
+        UpdateUIState(false, true); 
+
+        // 3. Trim the clip
+        AudioClip trimmedClip = TrimSilence(recordingClip, position);
+
+        // 4. Send to Whisper (Await here so UI stays in 'Thinking' mode)
+        string resultText = await TranscribeAudio(trimmedClip);
+
+        // 5. Reset UI to Idle
+        isProcessing = false;
+        UpdateUIState(false, false);
+    }
+
+    public async Task<string> TranscribeAudio(AudioClip clip)
+    {
+        if (clip == null || whisperManager == null) return "";
+
+        LogService.Log("MicService: Sending to Whisper...");
         
-        // Call the Whisper AI (Running locally on Quest CPU)
-        WhisperResult result = await instance.whisperManager.GetTextAsync(clip);
+        // Run Whisper
+        WhisperResult result = await whisperManager.GetTextAsync(clip);
+
+        // Output result
+        DisplayService.AddTextEntry($"MicService Result: {result.Result}");
         
+        // Assuming you have a DisplayService, otherwise delete this line:
+        // DisplayService.AddTextEntry(result.Result); 
+
         return result.Result;
     }
 
-    // --- Helper: Trim Silence from the end of the buffer ---
+    // --- Helpers ---
+
+    private void UpdateUIState(bool recording, bool processing)
+    {
+        if (processing)
+        {
+            RecordingButtonText.text = "Thinking...";
+            RecordingButtonText.color = Color.black;
+            RecordingButtonBackground.color = colorProcessing;
+        }
+        else if (recording)
+        {
+            RecordingButtonText.text = "Stop";
+            RecordingButtonText.color = Color.white;
+            RecordingButtonBackground.color = colorRecording;
+        }
+        else
+        {
+            RecordingButtonText.text = "Record";
+            RecordingButtonText.color = Color.black;
+            RecordingButtonBackground.color = colorIdle;
+        }
+    }
+
     private AudioClip TrimSilence(AudioClip original, int endPosition)
     {
-        if (endPosition <= 0) endPosition = original.samples;
+        // Safety check if endPosition is 0 (happens if instant click)
+        if (endPosition == 0) endPosition = 1; 
 
         float[] samples = new float[endPosition * original.channels];
         original.GetData(samples, 0);

@@ -17,7 +17,6 @@ public class AppController : MonoBehaviour
         "Thank you for using our service!",
         "TEAM: 6"
     };
-
     private float DEBUG_STREAM_INTERVAL = 1.0f;
 
     [Header("UI")]
@@ -49,54 +48,6 @@ public class AppController : MonoBehaviour
         {
             DisplayService.AddTextEntry(sentence);
             yield return new WaitForSeconds(DEBUG_STREAM_INTERVAL);
-        }
-    }
-
-    public async void ToggleRecording()
-    {
-        if (!isRecording)
-        {
-            // START
-            bool success = MicService.StartRecording();
-            if (success)
-            {
-                isRecording = true;
-                statusText.text = "Status: Recording...";
-                statusText.color = Color.red;
-            }
-        }
-        else
-        {
-            // STOP
-            isRecording = false;
-            statusText.text = "Status: Processing...";
-            statusText.color = Color.yellow;
-
-            // 1. Get Audio
-            AudioClip clip = MicService.StopRecording();
-
-            if (clip != null)
-            {
-                // 2. Transcribe (Local VR)
-                string text = await MicService.TranscribeAudio(clip);
-                LogService.Log(text);
-                statusText.text = "Status: Idle";
-                statusText.color = Color.white;
-
-                // 3. Send to Server (Cloud) via SocketService
-                // Example: Sending the text to a backend for logging or translation
-                string jsonBody = $"{{\"text\": \"{text}\"}}";
-                SocketService.SendRequest(SocketService.Method.POST, SERVER_URL, null, jsonBody, (response) => 
-                {
-                    if(response.isSuccess) Debug.Log("Server confirmed receipt");
-                    else Debug.LogError("Server Error: " + response.error);
-                });
-            }
-            else
-            {
-                statusText.text = "Status: Error (No Audio)";
-                LogService.Log("Error: No audio recorded.");
-            }
         }
     }
 }
