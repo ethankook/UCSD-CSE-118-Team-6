@@ -8,43 +8,45 @@ uvicorn main:app --reload
 http://localhost:8000/
 
 in dev console paste:
+A) start server
+uvicorn main:app --reload
 
-```
+B) connect 2 “headsets”
+
+Open browser console tab 1:
+
 const ws1 = new WebSocket("ws://localhost:8000/ws");
+ws1.onopen = () => ws1.send(JSON.stringify({ type: "set_lang", lang: "es" }));
+ws1.onmessage = e => console.log("ws1:", e.data);
 
-ws1.onopen = () => {
-  console.log("ws1 connected");
-  ws1.send(JSON.stringify({ type: "set_lang", lang: "es" })); // Spanish
-};
 
-ws1.onmessage = (event) => {
-  console.log("ws1 from server:", event.data);
-};
+Open browser console tab 2:
 
-ws1.onclose = () => {
-  console.log("ws1 closed");
-};
-```
-
-separate dev console: 
-```
 const ws2 = new WebSocket("ws://localhost:8000/ws");
-
-ws2.onopen = () => {
-  console.log("ws2 connected");
-  ws2.send(JSON.stringify({ type: "set_lang", lang: "zh" })); // Chinese
-};
-
-ws2.onmessage = (event) => {
-  console.log("ws2 from server:", event.data);
-};
-
-ws2.onclose = () => {
-  console.log("ws2 closed");
-};
-```
-
-Server console should show both websockets joining and the total increasing. It should also show the client language being updated since we send a set_lang request to the server.
+ws2.onopen = () => ws2.send(JSON.stringify({ type: "set_lang", lang: "zh" }));
+ws2.onmessage = e => console.log("ws2:", e.data);
 
 
-Amazon translate is not included in aws free tier, so we will ahve to use another free translation api like DeepL.
+You should see:
+
+Language set to es
+
+Language set to zh
+
+C) trigger translation
+
+In another terminal:
+
+curl -X POST http://localhost:8000/subtitle \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Hello everyone, welcome to the demo","source_lang":"en"}'
+
+
+Expected:
+
+ws1 console prints Spanish translation
+
+ws2 console prints Chinese translation
+
+If DeepL fails, you’ll see your fallback like:
+[ES untranslated] Hello everyone...
