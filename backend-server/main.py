@@ -2,7 +2,9 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 import uvicorn
 from typing import List, Dict, Optional
 import json
-import boto3
+import os
+import deepl
+
 
 
 # handles client connections and their preferred languages
@@ -100,24 +102,6 @@ class ConnectionManager:
                 self.add_to_lang_group(client, client.preferred_lang)
                 print(f"Client language updated to {new_lang}")
 
-    def translate_message(self, message: str, target_lang: str, source_lang: str) -> str:
-        """
-        Use AWS Translate to translate the message from source_lang to target_lang.
-        If source and target are the same, just return the original.
-        """
-        if target_lang == source_lang:
-            return message
-
-        translate_client = boto3.client("translate")
-
-        response = translate_client.translate_text(
-            Text=message,
-            SourceLanguageCode=source_lang,
-            TargetLanguageCode=target_lang,
-        )
-
-        return response["TranslatedText"]
-
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """
@@ -187,6 +171,35 @@ async def subtitle(
     """
     await manager.broadcast(text, source_lang=source_lang)
     return {"status": "ok", "original": text, "source_lang": source_lang}
+
+    def translate_message(self, message: str, target_lang: str, source_lang: str) -> str:
+        """
+        Translate using DeepL API Free.
+        Reads key from env var DEEPL_API_KEY.
+        """
+        target_lang = target_lang.upper()
+        source_lang = source_lang.upper()
+
+        if target_lang == source_lang:
+            return message
+
+        api_key = os.environ.get("DEEPL_API_KEY")
+        if not api_key:
+            print("[DEEPL ERROR] Missing DEEPL_API_KEY")
+            return f"[{target_lang} untranslated] {message}"
+
+        try:
+            translator = deepl.Translator(api_key)
+            result = translator.translate_text(
+                message,
+                source_lang=source_lang,
+                target_lang=target_lang
+            )
+            return result.text
+        except Exception as e:
+            print(f"[DEEPL ERROR] {e}")
+            return f"[{target_lang} untranslated] {message}"
+
 
 @app.get("/")
 async def root():
