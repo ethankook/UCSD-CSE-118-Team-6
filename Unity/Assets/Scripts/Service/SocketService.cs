@@ -186,16 +186,15 @@ public class SocketService : MonoBehaviour
             if (data.type == "heartbeat")
             {
                 // Optional: Log heartbeat
-                LogService.Log($"{data}");
+                DisplayService.AddTextEntry($"{data.text}");
             }
             else if (data.type == "chat")
             {
-                LogService.Log($"Chat Received: {data.text}");
                 DisplayService.AddTextEntry(data.text);
             }
             else
             {
-                LogService.Log($"{data}");
+                LogService.Log($"Unknown message type: {data}");
             }
         }
         catch (Exception e)

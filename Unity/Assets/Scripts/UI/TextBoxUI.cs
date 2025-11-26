@@ -1,17 +1,29 @@
+using System.Collections;
 using Meta.XR.ImmersiveDebugger.UserInterface.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class TextBoxUI : MonoBehaviour
 {
     [SerializeField] GameObject textEntryPrefab;
     [SerializeField] RectTransform contentArea;
+    [SerializeField] ScrollRect scrollRect;
+
+    void Start()
+    {
+        if (!scrollRect)
+        {
+            scrollRect = GetComponent<ScrollRect>();
+        }
+    }
 
     public void AddTextEntry(string text)
     {
         TextEntryUI entry = Instantiate(textEntryPrefab, contentArea).GetComponent<TextEntryUI>();
         entry.init(text);
         Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = 0f;
     }
     public void ClearText()
     {
@@ -20,5 +32,5 @@ public class TextBoxUI : MonoBehaviour
             Destroy(child.gameObject);
         }
     }
-
 }
+

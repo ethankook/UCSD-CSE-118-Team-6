@@ -167,7 +167,7 @@ public class MicService : MonoBehaviour
         else if (recording)
         {
             RecordingButtonText.text = "Stop";
-            RecordingButtonText.color = ConfigService.COLOR_PRIMARY;
+            RecordingButtonText.color = ConfigService.COLOR_PRIMARY; 
             RecordingButtonBackground.color = ConfigService.COLOR_ERROR;
         }
         else

@@ -35,7 +35,7 @@ public class MainCanvasUI : MonoBehaviour
             toggleFollowButton.onClick.AddListener(ToggleFollowCamera);
         }
     }
-
+    [ContextMenu("Toggle Follow Camera")]
     private void ToggleFollowCamera()
     {
         FollowCamera = !FollowCamera;
