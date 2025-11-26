@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+import uvicorn
 from typing import List, Dict, Optional
 import json
 import os
@@ -167,3 +168,7 @@ async def subtitle(
 @app.get("/")
 async def root():
     return {"message": "server running"}
+
+if __name__ == "__main__":
+   uvicorn.run(app="main:app", host="0.0.0.0", port=6543, reload=True)
+   
