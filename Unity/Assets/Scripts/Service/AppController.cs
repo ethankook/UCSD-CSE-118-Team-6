@@ -6,7 +6,6 @@ using System.Collections;
 
 public class AppController : MonoBehaviour
 {
-    const string SERVER_URL = "http://192.168.0.110:6543/";
 
     private string[] debugSentences = new string[]
     {
@@ -25,9 +24,9 @@ public class AppController : MonoBehaviour
     // Input mapping (adjust for your specific input system, e.g., OVRInput)
     private bool isRecording = false;
 
-    async void Start()
+    void Start()
     {
-        SocketService.SendRequest(SocketService.Method.GET, SERVER_URL, null, null, (response) => 
+        SocketService.SendRequest(SocketService.Method.GET, ConfigService.SERVER_URL, null, null, (response) => 
         {
             if(response.isSuccess)
             {
@@ -37,7 +36,7 @@ public class AppController : MonoBehaviour
                 LogService.Log($"Server Error: {response.error}");
             }
         });
-        await SocketService.ConnectSocket($"ws://{SERVER_URL}/ws");
+        SocketService.ConnectSocket($"ws://{ConfigService.SERVER_URL}/ws");
         // For debugging without mic input, simulate text stream
         StartCoroutine(SimulateTextStream());
     }

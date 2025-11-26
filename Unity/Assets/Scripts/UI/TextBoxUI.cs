@@ -13,5 +13,12 @@ public class TextBoxUI : MonoBehaviour
         entry.init(text);
         Canvas.ForceUpdateCanvases();
     }
+    public void ClearText()
+    {
+        foreach (Transform child in contentArea)
+        {
+            Destroy(child.gameObject);
+        }
+    }
 
 }

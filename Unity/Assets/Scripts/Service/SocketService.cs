@@ -4,12 +4,12 @@ using System.Collections;
 using System.Text;
 using System;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Net.Sockets;
-using System.Threading.Tasks;
+using System.Net.WebSockets; // Standard .NET Socket
 using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Concurrent; // Thread-safe queue
 
-// A simple response wrapper
+// Wrapper for REST responses
 [Serializable]
 public class NetworkResponse
 {
@@ -19,26 +19,56 @@ public class NetworkResponse
     public bool isSuccess => statusCode >= 200 && statusCode < 300 && string.IsNullOrEmpty(error);
 }
 
+// Wrapper for WebSocket messages
+[Serializable]
+public class SocketMessageData
+{
+    public string type;
+    public string text;
+    public string time;
+    public string lang;
+
+    public override string ToString()
+    {
+        return $"Type: {type}, Text: {text}, Time: {time}, Lang: {lang}";
+    }
+}
+
 public class SocketService : MonoBehaviour
 {
-    static SocketService instance;
+    public static SocketService instance;
+    
+    // Standard .NET WebSocket
+    private ClientWebSocket websocket; 
+    private CancellationTokenSource cancellationTokenSource;
 
-    private static ClientWebSocket socket;
-    // Define supported methods
+    // Thread-safe queue to pass messages from Background Thread -> Main Thread
+    private readonly ConcurrentQueue<Action> _executionQueue = new ConcurrentQueue<Action>();
+
     public enum Method { GET, POST, PUT, DELETE }
 
     void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
         instance = this;
+        DontDestroyOnLoad(this.gameObject);
     }
-    /// <summary>
-    /// Sends an HTTP Request (REST Style)
-    /// </summary>
-    /// <param name="method">GET, POST, etc.</param>
-    /// <param name="url">Target URL</param>
-    /// <param name="queryParams">Dictionary of query parameters (optional)</param>
-    /// <param name="bodyJson">JSON string for body (optional)</param>
-    /// <param name="callback">Action to run when finished</param>
+
+    void Update()
+    {
+        // EXECUTE QUEUED ACTIONS ON MAIN THREAD
+        // This replaces "DispatchMessageQueue" and prevents Quest crashes
+        while (_executionQueue.TryDequeue(out Action action))
+        {
+            action.Invoke();
+        }
+    }
+
+    // --- EXISTING REST METHOD ---
     public static void SendRequest(Method method, string url, Dictionary<string, string> queryParams, string bodyJson, Action<NetworkResponse> callback)
     {
         instance.StartCoroutine(instance.RequestRoutine(method, url, queryParams, bodyJson, callback));
@@ -46,21 +76,16 @@ public class SocketService : MonoBehaviour
 
     private IEnumerator RequestRoutine(Method method, string url, Dictionary<string, string> queryParams, string bodyJson, Action<NetworkResponse> callback)
     {
-        // 1. Construct Query String
         if (queryParams != null && queryParams.Count > 0)
         {
             url += "?";
             foreach (var param in queryParams)
-            {
                 url += $"{UnityWebRequest.EscapeURL(param.Key)}={UnityWebRequest.EscapeURL(param.Value)}&";
-            }
             url = url.TrimEnd('&');
         }
 
-        // 2. Create Request
         UnityWebRequest request = new UnityWebRequest(url, method.ToString());
         
-        // 3. Attach Body (if exists and not GET)
         if (!string.IsNullOrEmpty(bodyJson) && method != Method.GET)
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(bodyJson);
@@ -69,13 +94,9 @@ public class SocketService : MonoBehaviour
         }
 
         request.downloadHandler = new DownloadHandlerBuffer();
-
-        LogService.Log($"Sending {method} request to {url}");
         
-        // 4. Send and Wait
         yield return request.SendWebRequest();
 
-        // 5. Handle Response
         NetworkResponse response = new NetworkResponse
         {
             statusCode = request.responseCode,
@@ -87,66 +108,137 @@ public class SocketService : MonoBehaviour
         request.Dispose();
     }
 
-    // --- Placeholder for Future Socket.IO Implementation ---
-    // If you need real-time streaming later, you would initialize your Socket.IO client here.
-    public static async Task ConnectSocket(string socketURL) 
+    // --- NEW SOCKET IMPLEMENTATION (Standard .NET) ---
+
+    public static async void ConnectSocket(string socketURL)
     {
-        LogService.Log($"Connect to socket at {socketURL} ...");
-        socket = new ClientWebSocket();
+        await instance.Connect(socketURL);
+    }
+
+    private async Task Connect(string url)
+    {
+        // Cleanup old connection
+        if (websocket != null)
+        {
+            if (websocket.State == WebSocketState.Open)
+                await websocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Restarting", CancellationToken.None);
+            websocket.Dispose();
+        }
+
+        cancellationTokenSource = new CancellationTokenSource();
+        websocket = new ClientWebSocket();
+
         try
         {
-            Uri uri = new Uri(socketURL);
-            await socket.ConnectAsync(uri, System.Threading.CancellationToken.None);
-            LogService.Log("Socket connected!");
-            await ReceiveLoop();
+            LogService.Log($"Connecting to: {url}");
+            await websocket.ConnectAsync(new Uri(url), cancellationTokenSource.Token);
+            LogService.Log("Socket Connected!");
+
+            // Start listening in background
+            _ = ReceiveLoop(); 
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            LogService.Log($"Socket connection error: {ex.Message}");
+            LogService.Log($"Connection Error: {e.Message}");
         }
     }
 
-private static async Task ReceiveLoop()
+    private async Task ReceiveLoop()
     {
-        // Create a buffer to hold incoming data
-        var buffer = new ArraySegment<byte>(new byte[2048]);
+        var buffer = new byte[8192];
 
-        while (socket.State == WebSocketState.Open)
+        try
         {
-            // This line waits here until a message arrives
-            WebSocketReceiveResult result = await socket.ReceiveAsync(buffer, CancellationToken.None);
-
-            // If the server sends a Close request
-            if (result.MessageType == WebSocketMessageType.Close)
+            while (websocket.State == WebSocketState.Open)
             {
-                // --- EVENT: ON CLOSE ---
-                LogService.Log("Server closed the connection. (OnClose)");
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                var result = await websocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationTokenSource.Token);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await websocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server closed", CancellationToken.None);
+                    // Queue log to main thread
+                    _executionQueue.Enqueue(() => LogService.Log("Socket Closed by Server"));
+                }
+                else
+                {
+                    string message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    
+                    // CRITICAL: Queue the data processing to run on the Main Thread
+                    _executionQueue.Enqueue(() => HandleMessage(message));
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            if (websocket.State != WebSocketState.Aborted)
+            {
+                _executionQueue.Enqueue(() => LogService.Log($"Receive Error: {e.Message}"));
+            }
+        }
+    }
+
+    private void HandleMessage(string jsonMessage)
+    {
+        try 
+        {
+            SocketMessageData data = JsonUtility.FromJson<SocketMessageData>(jsonMessage);
+
+            if (data.type == "heartbeat")
+            {
+                // Optional: Log heartbeat
+                LogService.Log($"{data}");
+            }
+            else if (data.type == "chat")
+            {
+                LogService.Log($"Chat Received: {data.text}");
+                DisplayService.AddTextEntry(data.text);
             }
             else
             {
-                // Decode the bytes into a string
-                string message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
-
-                // --- EVENT: ON MESSAGE ---
-                LogService.Log("Message Received: " + message);
-                
-                // Handle your JSON or logic here:
-                // HandleMessage(message); 
+                LogService.Log($"{data}");
             }
         }
-    }
-    
-    public static void EmitSocketEvent(string eventName, string data)
-    {
-        LogService.Log($"TODO: Emit {eventName} with {data}");
+        catch (Exception e)
+        {
+            LogService.Log($"JSON Error: {e.Message} | Raw: {jsonMessage}");
+        }
     }
 
-    void OnDestroy()
+    public static async void EmitSocketEvent(string type, string text)
     {
-        if (socket != null)
+        if (instance.websocket != null && instance.websocket.State == WebSocketState.Open)
         {
-            socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", System.Threading.CancellationToken.None);
+            var payload = new SocketMessageData { type = type, text = text, lang = "en" };
+            string json = JsonUtility.ToJson(payload);
+            byte[] bytes = Encoding.UTF8.GetBytes(json);
+
+            try 
+            {
+                await instance.websocket.SendAsync(
+                    new ArraySegment<byte>(bytes), 
+                    WebSocketMessageType.Text, 
+                    true, 
+                    instance.cancellationTokenSource.Token
+                );
+            }
+            catch (Exception e)
+            {
+                LogService.Log($"Send Error: {e.Message}");
+            }
+        }
+        else
+        {
+            LogService.Log("Cannot emit: Socket not connected.");
+        }
+    }
+
+    private async void OnApplicationQuit()
+    {
+        if (websocket != null && websocket.State == WebSocketState.Open)
+        {
+            cancellationTokenSource?.Cancel();
+            await websocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "App Quit", CancellationToken.None);
+            websocket.Dispose();
         }
     }
 }

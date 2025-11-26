@@ -1,3 +1,4 @@
+from random import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
 import uvicorn
 from typing import List, Dict, Optional
@@ -168,6 +169,37 @@ async def subtitle(
 @app.get("/")
 async def root():
     return {"message": "server running"}
+
+async def send_heartbeat():
+    """
+    Periodically sends a heartbeat message to all clients.
+    """
+    while True:
+        try:
+            # Wait for 1 second
+            await asyncio.sleep(1)
+            
+            # Construct a JSON message
+            heartbeat_msg = json.dumps({
+                "type": "heartbeat",
+                "text": f"Server active, {random.randint(1000,9999)}",
+                "time": str(asyncio.get_event_loop().time())
+            })
+            
+            # Use your existing broadcast_raw method to avoid DeepL translation costs
+            if manager.active_connections:
+                await manager.broadcast_raw(heartbeat_msg)
+                
+        except Exception as e:
+            print(f"Heartbeat error: {e}")
+            await asyncio.sleep(5) # Wait longer if error occurs
+
+# 2. Register the task on startup
+@app.on_event("startup")
+async def startup_event():
+    # This runs the function in the background without blocking the server
+    asyncio.create_task(send_heartbeat())
+
 
 if __name__ == "__main__":
    uvicorn.run(app="main:app", host="0.0.0.0", port=6543, reload=True)

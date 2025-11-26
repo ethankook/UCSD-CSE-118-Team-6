@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class LogService : MonoBehaviour
 {
@@ -11,9 +12,15 @@ public class LogService : MonoBehaviour
     private bool enableLoggingInConsole = true;
     [SerializeField]
     private TextBoxUI logTextBox;
+    [SerializeField]
+    private Button clearLogsButton;
     void Awake()
     {
         instance = this;
+        if (clearLogsButton != null && logTextBox != null)
+        {
+            clearLogsButton.onClick.AddListener(() => logTextBox.ClearText());
+        }
     }
 
     public static void Log(string message)

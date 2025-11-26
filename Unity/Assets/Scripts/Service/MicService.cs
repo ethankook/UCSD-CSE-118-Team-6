@@ -8,7 +8,9 @@ using UnityEngine.UI;
 
 public class MicService : MonoBehaviour
 {
-    public static MicService instance;
+    // Color is not a compile-time constant, use readonly instead
+
+    private static MicService instance;
 
     [Header("Dependencies")]
     public WhisperManager whisperManager; 
@@ -26,15 +28,8 @@ public class MicService : MonoBehaviour
 
     [Header("UI Elements")]
     [SerializeField] private Button RecordingButton; // Assign your UI Button here to auto-add listener
-
     [SerializeField] private TextMeshProUGUI RecordingButtonText;
     [SerializeField] private Image RecordingButtonBackground;
-    
-    // Colors
-    private Color colorIdle = Color.cyan;
-    private Color colorRecording = Color.red;
-    private Color colorProcessing = Color.yellow;
-
     void Awake()
     {
         if (instance == null) instance = this;
@@ -166,20 +161,20 @@ public class MicService : MonoBehaviour
         if (processing)
         {
             RecordingButtonText.text = "Thinking...";
-            RecordingButtonText.color = Color.black;
-            RecordingButtonBackground.color = colorProcessing;
+            RecordingButtonText.color = ConfigService.COLOR_TEXT;
+            RecordingButtonBackground.color = ConfigService.COLOR_PRIMARY;
         }
         else if (recording)
         {
             RecordingButtonText.text = "Stop";
-            RecordingButtonText.color = Color.white;
-            RecordingButtonBackground.color = colorRecording;
+            RecordingButtonText.color = ConfigService.COLOR_PRIMARY;
+            RecordingButtonBackground.color = ConfigService.COLOR_ERROR;
         }
         else
         {
             RecordingButtonText.text = "Record";
-            RecordingButtonText.color = Color.black;
-            RecordingButtonBackground.color = colorIdle;
+            RecordingButtonText.color = ConfigService.COLOR_TEXT;
+            RecordingButtonBackground.color = ConfigService.COLOR_SECONDARY;
         }
     }
 
