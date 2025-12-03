@@ -14,6 +14,8 @@ public class LogService : MonoBehaviour
     private TextBoxUI logTextBox;
     [SerializeField]
     private Button clearLogsButton;
+
+
     void Awake()
     {
         instance = this;
@@ -37,7 +39,6 @@ public class LogService : MonoBehaviour
     {
         if (!enableLoggingOnUI || logTextBox == null) return;
 
-        string formattedMessage = logString;
         switch (type)
         {
             case LogType.Error:
@@ -51,16 +52,15 @@ public class LogService : MonoBehaviour
             case LogType.Warning:
                 LogWarning(logString);
                 return;
-            case LogType.Log:
-                Log(logString);
-                return;
             case LogType.Assert:
-                formattedMessage = $"<color=magenta>{logString}</color>";
+                LogAssertion(logString);
+                return;
+            case LogType.Log:
+                // No special formatting
                 break;
             default:
                 break;
         }
-        logTextBox.AddTextEntry(formattedMessage);
     }
     public static void Log(string message)
     {
@@ -70,7 +70,7 @@ public class LogService : MonoBehaviour
         }
         if (instance.enableLoggingOnUI && instance.logTextBox != null)
         {
-            instance.logTextBox.AddTextEntry(message);
+            instance.logTextBox.AddTextEntry(message, ConfigService.INFO_ICON, ConfigService.COLOR_PRIMARY);
         }
     }
 
@@ -82,7 +82,7 @@ public class LogService : MonoBehaviour
         }
         if (instance.enableLoggingOnUI && instance.logTextBox != null)
         {
-            instance.logTextBox.AddTextEntry($"<color=red>{message}</color>");
+            instance.logTextBox.AddTextEntry(message, ConfigService.ERROR_ICON, ConfigService.COLOR_ERROR);
         }
     }
     public static void LogWarning(string message)
@@ -93,7 +93,18 @@ public class LogService : MonoBehaviour
         }
         if (instance.enableLoggingOnUI && instance.logTextBox != null)
         {
-            instance.logTextBox.AddTextEntry($"<color=yellow>{message}</color>");
+            instance.logTextBox.AddTextEntry(message, ConfigService.WARNING_ICON, ConfigService.COLOR_WARNING);
+        }
+    }
+    public static void LogAssertion(string message)
+    {
+        if (instance.enableLoggingInConsole)
+        {
+            Debug.LogAssertion(message);
+        }
+        if (instance.enableLoggingOnUI && instance.logTextBox != null)
+        {
+            instance.logTextBox.AddTextEntry(message, ConfigService.ASSERTION_ICON, ConfigService.COLOR_ASSERTION);
         }
     }
     public static void ClearLogs()
