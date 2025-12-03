@@ -5,6 +5,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 
+# -----------------------------
+# MESSAGE TYPES
+# -----------------------------
+
 class MessageType(str, Enum):
     HELLO = "hello"
     SET_LANG = "set_lang"
@@ -20,9 +24,18 @@ class DisplayRole(str, Enum):
     NEUTRAL = "neutral"
 
 
-# ---------- WebSocket payloads sent to clients ----------
+# -----------------------------
+# PAYLOADS SENT OVER WEBSOCKET
+# -----------------------------
 
 class ChatPayload(BaseModel):
+    """
+    Generic chat / subtitle payload.
+
+    - original_text: what the sender actually said
+    - translated_text: what the receiver should see
+    - display_text: final string that the client can render directly
+    """
     type: MessageType = MessageType.CHAT
     source_id: Optional[str] = None
     target_id: Optional[str] = None
@@ -35,6 +48,14 @@ class ChatPayload(BaseModel):
 
 
 class HelloPayload(BaseModel):
+    """
+    Sent once when a client connects.
+
+    Lets the client know:
+      - its client_id
+      - its current preferred_lang
+      - whether it's registered as the Pi
+    """
     type: MessageType = MessageType.HELLO
     client_id: str
     preferred_lang: str
@@ -43,6 +64,9 @@ class HelloPayload(BaseModel):
 
 
 class SetLangPayload(BaseModel):
+    """
+    Acknowledgement after a client changes its language.
+    """
     type: MessageType = MessageType.SET_LANG
     text: str
     lang: str
@@ -51,28 +75,18 @@ class SetLangPayload(BaseModel):
 
 
 class ErrorPayload(BaseModel):
+    """
+    Error messages for invalid types, bad payloads, etc.
+    """
     type: MessageType = MessageType.ERROR
     text: str
     time: str
 
 
 class HeartbeatPayload(BaseModel):
+    """
+    Periodic server heartbeat.
+    """
     type: MessageType = MessageType.HEARTBEAT
     text: str
     time: str
-
-
-# ---------- HTTP request bodies ----------
-
-class SubtitleBroadcastRequest(BaseModel):
-    text: str
-    source_lang: str = "en"
-    source_client_id: Optional[str] = None
-
-
-class SubtitleOneRequest(BaseModel):
-    text: str
-    source_lang: str = "en"
-    target_lang: str = "en"
-    from_client_id: Optional[str] = None
-    to_client_id: str
