@@ -266,6 +266,7 @@ class ConnectionManager:
                 text=translated_text,
             )
             payload_target = ChatPayload(
+                type=MessageType.PERSONAL_CHAT,
                 source_id=source_client_id,
                 target_id=target_client_id,
                 source_lang=source_lang,
@@ -290,6 +291,7 @@ class ConnectionManager:
                 text=translated_text,
             )
             payload_source = ChatPayload(
+                type=MessageType.PERSONAL_CHAT,
                 source_id=source_client_id,
                 target_id=target_client_id,
                 source_lang=source_lang,
