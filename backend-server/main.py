@@ -41,16 +41,59 @@ class ConnectionManager:
         api_key = os.environ.get("DEEPL_API_KEY")
         self.translator = deepl.Translator(api_key) if api_key else None
 
-    # --- client lifecycle ---
+        # Track which client is the Raspberry Pi (one Pi per manager)
+        self.pi_client_id: Optional[str] = None
 
-    async def connect(self, websocket: WebSocket):
+    # --------- helper: find clients ---------
+
+    def get_client_by_ws(self, websocket: WebSocket) -> Optional[ClientConnection]:
+        for client in self.active_connections:
+            if client.websocket is websocket:
+                return client
+        return None
+
+    def get_client_by_id(self, client_id: str) -> Optional[ClientConnection]:
+        return self.clients_by_id.get(client_id)
+
+    # --------- helper: display text formatting ---------
+
+    @staticmethod
+    def build_display_text(
+        role: str,
+        source_id: Optional[str],
+        target_id: Optional[str],
+        text: str,
+    ) -> str:
+        """
+        role: "incoming"  -> receiver sees "[from <source>] text"
+              "outgoing"  -> sender sees "[to <target>] text"
+              anything else -> just text
+        """
+        if role == "incoming" and source_id:
+            return f"[from {source_id}] {text}"
+        if role == "outgoing" and target_id:
+            return f"[to {target_id}] {text}"
+        return text
+
+    # --------- client lifecycle ---------
+
+    async def connect(self, websocket: WebSocket, is_pi: bool = False):
         """Accept a new WebSocket and register a client."""
         await websocket.accept()
         client = ClientConnection(websocket=websocket, preferred_lang="en")
         self.active_connections.append(client)
         self.clients_by_id[client.client_id] = client
         self.add_to_lang_group(client, client.preferred_lang)
-        print(f"Client connected. Total: {len(self.active_connections)} client_id={client.client_id}")
+
+        # If this connection is the Pi, set pi_client_id here
+        if is_pi:
+            self.pi_client_id = client.client_id
+            print(f"[PI] Registered Raspberry Pi client on connect: {self.pi_client_id}")
+
+        print(
+            f"Client connected. Total: {len(self.active_connections)} "
+            f"client_id={client.client_id}, is_pi={is_pi}"
+        )
 
         # tell client its ID
         hello_msg = json.dumps(
@@ -58,6 +101,7 @@ class ConnectionManager:
                 "type": "hello",
                 "client_id": client.client_id,
                 "preferred_lang": client.preferred_lang,
+                "is_pi": is_pi,
                 "time": str(asyncio.get_event_loop().time()),
             },
             ensure_ascii=False,
@@ -72,20 +116,13 @@ class ConnectionManager:
             self.remove_from_all_lang_groups(client)
             if client.client_id in self.clients_by_id:
                 del self.clients_by_id[client.client_id]
+            # If the Pi disconnects, clear the Pi ID
+            if self.pi_client_id == client.client_id:
+                self.pi_client_id = None
+                print("[PI] Raspberry Pi client disconnected, cleared pi_client_id")
             print("Client disconnected. Total:", len(self.active_connections))
 
-    # --- lookup helpers ---
-
-    def get_client_by_ws(self, websocket: WebSocket) -> Optional[ClientConnection]:
-        for client in self.active_connections:
-            if client.websocket is websocket:
-                return client
-        return None
-
-    def get_client_by_id(self, client_id: str) -> Optional[ClientConnection]:
-        return self.clients_by_id.get(client_id)
-
-    # --- language group management ---
+    # --------- language group management ---------
 
     def add_to_lang_group(self, client: ClientConnection, lang: str):
         self.lang_groups.setdefault(lang, []).append(client)
@@ -117,7 +154,7 @@ class ConnectionManager:
             self.add_to_lang_group(client, new_lang)
             print(f"Client language updated to {new_lang}")
 
-    # --- translation only ---
+    # --------- translation only ---------
 
     def translate_text(self, text: str, target_lang: str, source_lang: str) -> str:
         """
@@ -144,57 +181,106 @@ class ConnectionManager:
             print(f"[DEEPL ERROR] {e}")
             return f"[{target_lang} untranslated] {text}"
 
-    # --- 1-to-1 messaging ---
+    # --------- 1-to-1 messaging (chat + subtitles_one) ---------
 
     async def send_personal_message_by_id(
         self,
-        text: str,
+        *,
+        original_text: str,
+        translated_text: str,
         source_client_id: Optional[str],
         target_client_id: str,
         source_lang: Optional[str] = None,
         target_lang: Optional[str] = None,
     ):
         """
-        True 1-to-1: send a message from source_client_id -> target_client_id.
-        This function ONLY sends, does NOT translate.
+        True 1-to-1:
+        - receiver sees "[from <source>] <translated_text>"
+        - sender sees "[to <target>] <translated_text>"
         """
+        time_str = str(asyncio.get_event_loop().time())
         target = self.get_client_by_id(target_client_id)
-        if not target:
+        source_client = self.get_client_by_id(source_client_id) if source_client_id else None
+
+        # 1) Send to target (incoming)
+        if target:
+            incoming_display = self.build_display_text(
+                role="incoming",
+                source_id=source_client_id,
+                target_id=target_client_id,
+                text=translated_text,
+            )
+            payload_target = {
+                "type": "chat",
+                "source_id": source_client_id,
+                "target_id": target_client_id,
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "original_text": original_text,
+                "translated_text": translated_text,
+                "display_text": incoming_display,
+                "time": time_str,
+            }
+            await target.websocket.send_text(json.dumps(payload_target, ensure_ascii=False))
+        else:
             print(f"[WARN] target_client_id {target_client_id} not found")
-            return
 
-        payload = {
-            "type": "chat",
-            "text": text,
-            "source_id": source_client_id,
-            "target_id": target_client_id,
-            "source_lang": source_lang,
-            "target_lang": target_lang,
-            "time": str(asyncio.get_event_loop().time()),
-        }
+        # 2) Echo back to sender (outgoing) so sender sees who they sent to
+        if source_client:
+            outgoing_display = self.build_display_text(
+                role="outgoing",
+                source_id=source_client_id,
+                target_id=target_client_id,
+                text=translated_text,
+            )
+            payload_source = {
+                "type": "chat",
+                "source_id": source_client_id,
+                "target_id": target_client_id,
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "original_text": original_text,
+                "translated_text": translated_text,
+                "display_text": outgoing_display,
+                "time": time_str,
+            }
+            await source_client.websocket.send_text(json.dumps(payload_source, ensure_ascii=False))
 
-        await target.websocket.send_text(json.dumps(payload, ensure_ascii=False))
+    # --------- broadcast chat (ws -> all other clients) ---------
 
     async def broadcast_chat_from_ws(self, websocket: WebSocket, text: str):
         """
         Broadcast a chat message from one websocket to all connected clients.
-        Includes source_id and target_id for each message.
+        - Does NOT send back to the sender.
+        - Receivers see "[from <source>] <text>" in display_text.
         """
         source_client = self.get_client_by_ws(websocket)
         source_id = source_client.client_id if source_client else None
         now = str(asyncio.get_event_loop().time())
 
         for client in self.active_connections:
+            if client is source_client:
+                continue  # do not broadcast to self
+            display_text = self.build_display_text(
+                role="incoming",
+                source_id=source_id,
+                target_id=client.client_id,
+                text=text,
+            )
             payload = {
                 "type": "chat",
-                "text": text,
                 "source_id": source_id,
                 "target_id": client.client_id,
+                "source_lang": None,
+                "target_lang": None,
+                "original_text": text,
+                "translated_text": text,
+                "display_text": display_text,
                 "time": now,
             }
             await client.websocket.send_text(json.dumps(payload, ensure_ascii=False))
 
-    # --- broadcast subtitles ---
+    # --------- broadcast subtitles (HTTP /subtitle) ---------
 
     async def broadcast_translated(
         self,
@@ -204,33 +290,47 @@ class ConnectionManager:
     ):
         """
         Translate 'text' per language group and broadcast to all clients.
-        Includes source_id and per-client target_id.
+        - Does NOT send to the source client (if provided).
+        - Receivers see "[from <source>] <translated_text>".
         """
         loop_time = str(asyncio.get_event_loop().time())
 
         for target_lang, clients in self.lang_groups.items():
+            # Compute translated text once per target language
             translated_text = await asyncio.to_thread(
                 self.translate_text, text, target_lang, source_lang
             )
 
             for client in clients:
+                # Skip sending subtitles back to the originating client
+                if source_client_id and client.client_id == source_client_id:
+                    continue
+
+                display_text = self.build_display_text(
+                    role="incoming",
+                    source_id=source_client_id,
+                    target_id=client.client_id,
+                    text=translated_text,
+                )
                 payload = {
                     "type": "chat",
-                    "text": translated_text,
-                    "original_text": text,
-                    "source_lang": source_lang,
-                    "target_lang": target_lang,
                     "source_id": source_client_id,
                     "target_id": client.client_id,
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "original_text": text,
+                    "translated_text": translated_text,
+                    "display_text": display_text,
                     "time": loop_time,
                 }
                 await client.websocket.send_text(json.dumps(payload, ensure_ascii=False))
 
-    # --- low-level broadcast (raw string) ---
+    # --------- low-level broadcast (raw string) ---------
 
     async def broadcast_raw(self, message: str):
         """
         Broadcast a pre-encoded string to all clients (used for heartbeat).
+        Here there's no "sender", so everyone receives it.
         """
         for client in self.active_connections:
             await client.websocket.send_text(message)
@@ -248,17 +348,25 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     Main WebSocket endpoint.
 
-    Expected message shapes:
-    - { "type": "set_lang", "lang": "es" }
-    - { "type": "chat", "text": "hello" }
-    - {
-        "type": "personal_chat",
-        "text": "hi",
-        "from_client_id": "<id>",
-        "to_client_id": "<id>"
-      }
+    Clients:
+      - Normal: ws://host:6543/ws
+      - Pi:     ws://host:6543/ws?role=pi
+
+    Messages:
+      - { "type": "set_lang", "lang": "es" }
+      - { "type": "chat", "text": "hello" }
+      - {
+          "type": "personal_chat",
+          "text": "hi",
+          "from_client_id": "<id>",
+          "to_client_id": "<id>"
+        }
     """
-    await manager.connect(websocket)
+    role = websocket.query_params.get("role")
+    is_pi = (role == "pi")
+
+    await manager.connect(websocket, is_pi=is_pi)
+
     try:
         while True:
             raw_data = await websocket.receive_text()
@@ -283,18 +391,22 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif msg_type == "chat":
                 text = data.get("text", "")
-                # broadcast chat from this websocket to all (with source/target IDs)
+                # broadcast chat from this websocket to all others
                 await manager.broadcast_chat_from_ws(websocket, text)
 
             elif msg_type == "personal_chat":
+                # 1-to-1 message over WebSocket (no translation here)
                 text = data.get("text", "")
                 from_client_id = data.get("from_client_id")
                 to_client_id = data.get("to_client_id")
 
                 await manager.send_personal_message_by_id(
-                    text=text,
+                    original_text=text,
+                    translated_text=text,
                     source_client_id=from_client_id,
                     target_client_id=to_client_id,
+                    source_lang=None,
+                    target_lang=None,
                 )
 
             else:
@@ -317,6 +429,7 @@ async def subtitle_broadcast(
 ):
     """
     Broadcast a subtitle line to all clients, translating per language group.
+    The originating client (source_client_id) will NOT receive its own subtitle.
     """
     await manager.broadcast_translated(
         text=text,
@@ -348,8 +461,10 @@ async def subtitle_one(
     """
     translated = manager.translate_text(text, target_lang, source_lang)
 
+    # send to receiver + echo to sender with clear IDs
     await manager.send_personal_message_by_id(
-        text=translated,
+        original_text=text,
+        translated_text=translated,
         source_client_id=from_client_id,
         target_client_id=to_client_id,
         source_lang=source_lang,
@@ -374,7 +489,9 @@ async def debug_lang_groups():
         "lang_groups": {
             lang: len(clients)
             for lang, clients in manager.lang_groups.items()
-        }
+        },
+        "pi_client_id": manager.pi_client_id,
+        "active_clients": len(manager.active_connections),
     }
 
 
