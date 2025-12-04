@@ -9,12 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from connection_manager import ConnectionManager
-from models import (
-    ErrorPayload,
-    HeartbeatPayload,
-    MessageType,
-    SetLangPayload,
-)
+from models import ChatPayload, MessageType
 
 # ENV + APP SETUP
 
@@ -42,7 +37,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     Message types (JSON):
       1) set_lang
-         { "type": "set_lang", "lang": "en" }
+         { "type": "set_lang", "lang": "EN" }
 
       2) chat  (group chat, per-target translation)
          { "type": "chat", "text": "Hello everyone" }
@@ -65,7 +60,8 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 data = json.loads(raw_data)
             except json.JSONDecodeError:
-                error = ErrorPayload(
+                error = ChatPayload(
+                    type=MessageType.ERROR,
                     text="Invalid JSON",
                     time=str(asyncio.get_event_loop().time()),
                 )
@@ -79,7 +75,8 @@ async def websocket_endpoint(websocket: WebSocket):
             try:
                 msg_type = MessageType(raw_type)
             except ValueError:
-                error = ErrorPayload(
+                error = ChatPayload(
+                    type=MessageType.ERROR,
                     text=f"Unknown message type: {raw_type}",
                     time=str(asyncio.get_event_loop().time()),
                 )
@@ -91,13 +88,14 @@ async def websocket_endpoint(websocket: WebSocket):
             # 4) Handle each message type
             if msg_type == MessageType.SET_LANG:
                 # Client wants to update its preferred language.
-                new_lang = data.get("lang", "en")
+                new_lang = data.get("lang", "EN")
                 await manager.update_client_lang(websocket, new_lang)
 
                 client = manager.get_client_by_ws(websocket)
                 client_id = client.client_id if client else None
 
-                payload = SetLangPayload(
+                payload = ChatPayload(
+                    type=MessageType.SET_LANG,
                     text=f"Language set to {new_lang}",
                     lang=new_lang,
                     client_id=client_id,
@@ -118,7 +116,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 to_client_id = data.get("to_client_id")
 
                 if not text or not to_client_id:
-                    error = ErrorPayload(
+                    error = ChatPayload(
+                        type=MessageType.ERROR,
                         text="Missing 'text' or 'to_client_id' for personal_chat",
                         time=str(asyncio.get_event_loop().time()),
                     )
@@ -134,8 +133,9 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
 
             else:
-                # HELLO, ERROR, HEARTBEAT are server-side only; ignore here.
-                error = ErrorPayload(
+                # HELLO, ERROR, HEARTBEAT from clients not supported
+                error = ChatPayload(
+                    type=MessageType.ERROR,
                     text=f"Unsupported WebSocket type from client: {raw_type}",
                     time=str(asyncio.get_event_loop().time()),
                 )
@@ -158,7 +158,8 @@ async def send_heartbeat():
     while True:
         try:
             await asyncio.sleep(1)
-            payload = HeartbeatPayload(
+            payload = ChatPayload(
+                type=MessageType.HEARTBEAT,
                 text=f"Server active, {random.randint(1000, 9999)}",
                 time=str(asyncio.get_event_loop().time()),
             )

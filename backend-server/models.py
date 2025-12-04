@@ -5,9 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-# -----------------------------
 # MESSAGE TYPES
-# -----------------------------
 
 class MessageType(str, Enum):
     HELLO = "hello"
@@ -24,69 +22,42 @@ class DisplayRole(str, Enum):
     NEUTRAL = "neutral"
 
 
-# -----------------------------
-# PAYLOADS SENT OVER WEBSOCKET
-# -----------------------------
+# SINGLE UNIFIED PAYLOAD
 
 class ChatPayload(BaseModel):
     """
-    Generic chat / subtitle payload.
+    Unified payload used for ALL messages:
 
-    - original_text: what the sender actually said
-    - translated_text: what the receiver should see
-    - display_text: final string that the client can render directly
+    - HELLO
+    - SET_LANG
+    - CHAT / PERSONAL_CHAT
+    - ERROR
+    - HEARTBEAT
+
+    Many fields are optional; different message types
+    only use the ones they care about.
     """
-    type: MessageType = MessageType.CHAT
-    source_id: Optional[str] = None
-    target_id: Optional[str] = None
-    source_lang: Optional[str] = None
-    target_lang: Optional[str] = None
-    original_text: str
-    translated_text: str
-    display_text: str
+
+    # Core envelope
+    type: MessageType
     time: str
 
+    # Generic identity fields
+    source_id: Optional[str] = None     # sender client_id (for chat/personal_chat)
+    target_id: Optional[str] = None     # receiver client_id (for personal_chat)
+    client_id: Optional[str] = None     # for HELLO / SET_LANG
 
-class HelloPayload(BaseModel):
-    """
-    Sent once when a client connects.
+    # Language-related fields
+    source_lang: Optional[str] = None   # sender language
+    target_lang: Optional[str] = None   # receiver language
+    lang: Optional[str] = None          # for SET_LANG (new language)
+    preferred_lang: Optional[str] = None  # for HELLO
 
-    Lets the client know:
-      - its client_id
-      - its current preferred_lang
-      - whether it's registered as the Pi
-    """
-    type: MessageType = MessageType.HELLO
-    client_id: str
-    preferred_lang: str
-    is_pi: bool
-    time: str
+    # Text payloads
+    text: Optional[str] = None          # generic text (error, heartbeat, set_lang msg)
+    original_text: Optional[str] = None # what the sender actually said
+    translated_text: Optional[str] = None  # translated version for receiver
+    display_text: Optional[str] = None  # final string client can render directly
 
-
-class SetLangPayload(BaseModel):
-    """
-    Acknowledgement after a client changes its language.
-    """
-    type: MessageType = MessageType.SET_LANG
-    text: str
-    lang: str
-    client_id: Optional[str] = None
-    time: str
-
-
-class ErrorPayload(BaseModel):
-    """
-    Error messages for invalid types, bad payloads, etc.
-    """
-    type: MessageType = MessageType.ERROR
-    text: str
-    time: str
-
-
-class HeartbeatPayload(BaseModel):
-    """
-    Periodic server heartbeat.
-    """
-    type: MessageType = MessageType.HEARTBEAT
-    text: str
-    time: str
+    # Misc
+    is_pi: Optional[bool] = None        # mark if this connection is the Pi (for HELLO/chat, etc.)

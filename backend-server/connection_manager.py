@@ -11,8 +11,7 @@ from fastapi import WebSocket
 from models import (
     ChatPayload,
     DisplayRole,
-    HelloPayload,
-    MessageType
+    MessageType,
 )
 
 
@@ -22,14 +21,14 @@ class ClientConnection:
 
     Fields:
       - websocket: the underlying WebSocket connection
-      - preferred_lang: language code like "en", "es", "zh", etc.
+      - preferred_lang: language code like "EN", "ES", "ZH", etc.
       - client_id: UUID that identifies this client across messages
     """
 
     def __init__(
         self,
         websocket: WebSocket,
-        preferred_lang: str = "en",
+        preferred_lang: str = "EN",
         client_id: Optional[str] = None,
     ):
         self.websocket = websocket
@@ -56,7 +55,7 @@ class ConnectionManager:
         # Map client_id -> ClientConnection
         self.clients_by_id: Dict[str, ClientConnection] = {}
 
-        # (Optional) language groups (not strictly required, but kept for flexibility)
+        # Optional language groups
         self.lang_groups: Dict[str, List[ClientConnection]] = {}
 
         # Raspberry Pi client ID (if any)
@@ -111,11 +110,11 @@ class ConnectionManager:
           2) Create ClientConnection
           3) Track in internal lists
           4) Optionally mark as Pi client
-          5) Send HelloPayload (type=hello)
+          5) Send HELLO message (via ChatPayload)
         """
         await websocket.accept()
 
-        client = ClientConnection(websocket=websocket, preferred_lang="en")
+        client = ClientConnection(websocket=websocket, preferred_lang="EN")
         self.active_connections.append(client)
         self.clients_by_id[client.client_id] = client
         self.add_to_lang_group(client, client.preferred_lang)
@@ -130,7 +129,8 @@ class ConnectionManager:
         )
 
         # Send initial hello message with client_id + current language
-        hello = HelloPayload(
+        hello = ChatPayload(
+            type=MessageType.HELLO,
             client_id=client.client_id,
             preferred_lang=client.preferred_lang,
             is_pi=is_pi,
@@ -162,7 +162,7 @@ class ConnectionManager:
 
         print(f"[DISCONNECT] client_id={client.client_id}, total_clients={len(self.active_connections)}")
 
-    # Language group management (optional, but kept for potential use)
+    # Language group management
 
     def add_to_lang_group(self, client: ClientConnection, lang: str):
         self.lang_groups.setdefault(lang, []).append(client)
@@ -400,6 +400,7 @@ class ConnectionManager:
             )
 
             payload = ChatPayload(
+                type=MessageType.CHAT,
                 source_id=source_id,
                 target_id=client.client_id,
                 source_lang=source_lang,
