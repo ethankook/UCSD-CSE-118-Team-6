@@ -16,6 +16,6 @@ public class DisplayService : MonoBehaviour
     }
     public static void AddTextEntry(string text)
     {
-        instance.textBox.AddTextEntry(text);
+        instance.textBox.AddTextEntry(text, ConfigService.CHAT_ICON, ConfigService.COLOR_PRIMARY);
     }
 }

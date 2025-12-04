@@ -18,10 +18,10 @@ public class TextBoxUI : MonoBehaviour
         }
     }
 
-    public void AddTextEntry(string text)
+    public void AddTextEntry(string text, Sprite icon = null, Color color = default)
     {
         TextEntryUI entry = Instantiate(textEntryPrefab, contentArea).GetComponent<TextEntryUI>();
-        entry.init(text);
+        entry.init(text, icon, color);
         Canvas.ForceUpdateCanvases();
         scrollRect.verticalNormalizedPosition = 0f;
     }

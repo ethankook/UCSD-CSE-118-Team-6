@@ -7,7 +7,8 @@ using System.Collections.Generic;
 using System.Net.WebSockets; // Standard .NET Socket
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent; // Thread-safe queue
+using System.Collections.Concurrent;
+using System.Net.Sockets; // Thread-safe queue
 
 // Wrapper for REST responses
 [Serializable]
@@ -19,20 +20,6 @@ public class NetworkResponse
     public bool isSuccess => statusCode >= 200 && statusCode < 300 && string.IsNullOrEmpty(error);
 }
 
-// Wrapper for WebSocket messages
-[Serializable]
-public class SocketMessageData
-{
-    public string type;
-    public string text;
-    public string time;
-    public string lang;
-
-    public override string ToString()
-    {
-        return $"Type: {type}, Text: {text}, Time: {time}, Lang: {lang}";
-    }
-}
 
 public class SocketService : MonoBehaviour
 {
@@ -68,7 +55,6 @@ public class SocketService : MonoBehaviour
         }
     }
 
-    // --- EXISTING REST METHOD ---
     public static void SendRequest(Method method, string url, Dictionary<string, string> queryParams, string bodyJson, Action<NetworkResponse> callback)
     {
         instance.StartCoroutine(instance.RequestRoutine(method, url, queryParams, bodyJson, callback));
@@ -108,8 +94,6 @@ public class SocketService : MonoBehaviour
         request.Dispose();
     }
 
-    // --- NEW SOCKET IMPLEMENTATION (Standard .NET) ---
-
     public static async void ConnectSocket(string socketURL)
     {
         await instance.Connect(socketURL);
@@ -134,12 +118,31 @@ public class SocketService : MonoBehaviour
             await websocket.ConnectAsync(new Uri(url), cancellationTokenSource.Token);
             LogService.Log("Socket Connected!");
 
+            // set the language after connecting
+            var setLangMessage = new SocketSetLangMessage(ConfigService.Preferred_Language_Code);
+            string langJson = JsonUtility.ToJson(setLangMessage);
+            byte[] langBytes = Encoding.UTF8.GetBytes(langJson);
+            try 
+            {
+                await websocket.SendAsync(
+                    new ArraySegment<byte>(langBytes), 
+                    WebSocketMessageType.Text, 
+                    true, 
+                    cancellationTokenSource.Token
+                );
+                LogService.Log($"Sent Preferred Language: {ConfigService.Preferred_Language_Code}");
+            }
+            catch (Exception e)
+            {
+                LogService.LogError($"Send Language Error: {e.Message}");
+            }
+
             // Start listening in background
             _ = ReceiveLoop(); 
         }
         catch (Exception e)
         {
-            LogService.Log($"Connection Error: {e.Message}");
+            LogService.LogError($"Connection Error: {e.Message}");
         }
     }
 
@@ -157,7 +160,7 @@ public class SocketService : MonoBehaviour
                 {
                     await websocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server closed", CancellationToken.None);
                     // Queue log to main thread
-                    _executionQueue.Enqueue(() => LogService.Log("Socket Closed by Server"));
+                    _executionQueue.Enqueue(() => LogService.LogWarning("Socket Closed by Server"));
                 }
                 else
                 {
@@ -172,7 +175,7 @@ public class SocketService : MonoBehaviour
         {
             if (websocket.State != WebSocketState.Aborted)
             {
-                _executionQueue.Enqueue(() => LogService.Log($"Receive Error: {e.Message}"));
+                _executionQueue.Enqueue(() => LogService.LogError($"Receive Error: {e.Message}"));
             }
         }
     }
@@ -181,25 +184,25 @@ public class SocketService : MonoBehaviour
     {
         try 
         {
-            SocketMessageData data = JsonUtility.FromJson<SocketMessageData>(jsonMessage);
+            SocketMessage data = SocketMessage.FromJson(jsonMessage);
 
-            if (data.type == "heartbeat")
+            if (data.type == SocketMessageType.heartbeat)
             {
                 // Optional: Log heartbeat
-                DisplayService.AddTextEntry($"{data.text}");
+                LogService.Log(data.display_text);
             }
-            else if (data.type == "chat")
+            else if (data.type == SocketMessageType.chat)
             {
-                DisplayService.AddTextEntry(data.text);
+                DisplayService.AddTextEntry(data.display_text);
             }
             else
             {
-                LogService.Log($"Unknown message type: {data}");
+                LogService.LogError($"Unknown message type: {data}");
             }
         }
         catch (Exception e)
         {
-            LogService.Log($"JSON Error: {e.Message} | Raw: {jsonMessage}");
+            LogService.LogError($"JSON Error: {e.Message} | Raw: {jsonMessage}");
         }
     }
 
@@ -207,8 +210,19 @@ public class SocketService : MonoBehaviour
     {
         if (instance.websocket != null && instance.websocket.State == WebSocketState.Open)
         {
-            var payload = new SocketMessageData { type = type, text = text, lang = "en" };
-            string json = JsonUtility.ToJson(payload);
+            var payload = new SocketMessage
+            (
+                type: SocketMessageType.chat,
+                sourceId: "client",
+                targetId: "server",
+                sourceLang: "en",
+                targetLang: "es",
+                originalText: text,
+                translatedText: "",
+                displayText: text,
+                time: Time.time
+            );
+            string json = payload.ToJson();
             byte[] bytes = Encoding.UTF8.GetBytes(json);
 
             try 
@@ -222,12 +236,12 @@ public class SocketService : MonoBehaviour
             }
             catch (Exception e)
             {
-                LogService.Log($"Send Error: {e.Message}");
+                LogService.LogError($"Send Error: {e.Message}");
             }
         }
         else
         {
-            LogService.Log("Cannot emit: Socket not connected.");
+            LogService.LogError("Cannot emit: Socket not connected.");
         }
     }
 
