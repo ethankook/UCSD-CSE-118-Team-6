@@ -22,42 +22,84 @@ class DisplayRole(str, Enum):
     NEUTRAL = "neutral"
 
 
-# SINGLE UNIFIED PAYLOAD
+# ---------- PAYLOADS ----------
 
 class ChatPayload(BaseModel):
     """
-    Unified payload used for ALL messages:
+    Chat / subtitle payload.
 
-    - HELLO
-    - SET_LANG
-    - CHAT / PERSONAL_CHAT
-    - ERROR
-    - HEARTBEAT
+    Used for:
+      - type=CHAT (broadcast)
+      - type=PERSONAL_CHAT (1-to-1)
 
-    Many fields are optional; different message types
-    only use the ones they care about.
+    Includes:
+      - IDs + display names
+      - source/target languages
+      - original + translated text
+      - display_text for convenient rendering
     """
+    type: MessageType  # CHAT or PERSONAL_CHAT
 
-    # Core envelope
-    type: MessageType
+    source_id: Optional[str] = None
+    target_id: Optional[str] = None
+
+    source_display_name: Optional[str] = None
+    target_display_name: Optional[str] = None
+
+    source_lang: Optional[str] = None
+    target_lang: Optional[str] = None
+
+    original_text: Optional[str] = None
+    translated_text: Optional[str] = None
+    display_text: Optional[str] = None
+
+    time: str
+    is_pi: Optional[bool] = None  # optional flag if this message is from the Pi
+
+
+class HelloPayload(BaseModel):
+    """
+    Sent once when a client connects.
+
+    Lets the client know:
+      - its client_id
+      - its current preferred_lang
+      - its display_name
+      - whether it's registered as the Pi
+    """
+    type: MessageType = MessageType.HELLO
+    client_id: str
+    preferred_lang: str
+    display_name: str
+    is_pi: bool
     time: str
 
-    # Generic identity fields
-    source_id: Optional[str] = None     # sender client_id (for chat/personal_chat)
-    target_id: Optional[str] = None     # receiver client_id (for personal_chat)
-    client_id: Optional[str] = None     # for HELLO / SET_LANG
 
-    # Language-related fields
-    source_lang: Optional[str] = None   # sender language
-    target_lang: Optional[str] = None   # receiver language
-    lang: Optional[str] = None          # for SET_LANG (new language)
-    preferred_lang: Optional[str] = None  # for HELLO
+class SetLangPayload(BaseModel):
+    """
+    Acknowledgement after a client changes its language and/or display name.
+    """
+    type: MessageType = MessageType.SET_LANG
+    text: str                 # human-readable message ("Language set to en")
+    lang: str                 # new preferred language (app-level code, e.g. "en")
+    client_id: Optional[str] = None
+    display_name: Optional[str] = None
+    time: str
 
-    # Text payloads
-    text: Optional[str] = None          # generic text (error, heartbeat, set_lang msg)
-    original_text: Optional[str] = None # what the sender actually said
-    translated_text: Optional[str] = None  # translated version for receiver
-    display_text: Optional[str] = None  # final string client can render directly
 
-    # Misc
-    is_pi: Optional[bool] = None        # mark if this connection is the Pi (for HELLO/chat, etc.)
+class ErrorPayload(BaseModel):
+    """
+    Error messages for invalid types, bad payloads, etc.
+    """
+    type: MessageType = MessageType.ERROR
+    text: str
+    time: str
+
+
+class HeartbeatPayload(BaseModel):
+    """
+    Periodic server heartbeat.
+    """
+    type: MessageType = MessageType.HEARTBEAT
+    text: str
+    time: str
