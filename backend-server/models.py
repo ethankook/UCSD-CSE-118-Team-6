@@ -5,9 +5,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-# -----------------------------
 # MESSAGE TYPES
-# -----------------------------
 
 class MessageType(str, Enum):
     HELLO = "hello"
@@ -24,27 +22,39 @@ class DisplayRole(str, Enum):
     NEUTRAL = "neutral"
 
 
-# -----------------------------
-# PAYLOADS SENT OVER WEBSOCKET
-# -----------------------------
+# ---------- PAYLOADS ----------
 
 class ChatPayload(BaseModel):
     """
-    Generic chat / subtitle payload.
+    Chat / subtitle payload.
 
-    - original_text: what the sender actually said
-    - translated_text: what the receiver should see
-    - display_text: final string that the client can render directly
+    Used for:
+      - type=CHAT (broadcast)
+      - type=PERSONAL_CHAT (1-to-1)
+
+    Includes:
+      - IDs + display names
+      - source/target languages
+      - original + translated text
+      - display_text for convenient rendering
     """
-    type: MessageType = MessageType.CHAT
+    type: MessageType  # CHAT or PERSONAL_CHAT
+
     source_id: Optional[str] = None
     target_id: Optional[str] = None
+
+    source_display_name: Optional[str] = None
+    target_display_name: Optional[str] = None
+
     source_lang: Optional[str] = None
     target_lang: Optional[str] = None
-    original_text: str
-    translated_text: str
-    display_text: str
+
+    original_text: Optional[str] = None
+    translated_text: Optional[str] = None
+    display_text: Optional[str] = None
+
     time: str
+    is_pi: Optional[bool] = None  # optional flag if this message is from the Pi
 
 
 class HelloPayload(BaseModel):
@@ -54,23 +64,26 @@ class HelloPayload(BaseModel):
     Lets the client know:
       - its client_id
       - its current preferred_lang
+      - its display_name
       - whether it's registered as the Pi
     """
     type: MessageType = MessageType.HELLO
     client_id: str
     preferred_lang: str
+    display_name: str
     is_pi: bool
     time: str
 
 
 class SetLangPayload(BaseModel):
     """
-    Acknowledgement after a client changes its language.
+    Acknowledgement after a client changes its language and/or display name.
     """
     type: MessageType = MessageType.SET_LANG
-    text: str
-    lang: str
+    text: str                 # human-readable message ("Language set to en")
+    lang: str                 # new preferred language (app-level code, e.g. "en")
     client_id: Optional[str] = None
+    display_name: Optional[str] = None
     time: str
 
 

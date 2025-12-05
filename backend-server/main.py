@@ -32,7 +32,7 @@ async def websocket_endpoint(websocket: WebSocket):
     """
     Main WebSocket endpoint.
 
-    Clients connect here (no HTTP subtitles at all):
+    Clients connect here:
 
       - Normal client:
           ws://<host>:8000/ws
@@ -42,7 +42,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     Message types (JSON):
       1) set_lang
-         { "type": "set_lang", "lang": "en" }
+         { "type": "set_lang", "lang": "en", "display_name": "Alice (EN)" }
 
       2) chat  (group chat, per-target translation)
          { "type": "chat", "text": "Hello everyone" }
@@ -90,17 +90,22 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # 4) Handle each message type
             if msg_type == MessageType.SET_LANG:
-                # Client wants to update its preferred language.
+                # Client wants to update its preferred language (and optionally its display name).
                 new_lang = data.get("lang", "en")
-                await manager.update_client_lang(websocket, new_lang)
+                display_name = data.get("display_name")
+
+                await manager.update_client_lang(websocket, new_lang, display_name)
 
                 client = manager.get_client_by_ws(websocket)
                 client_id = client.client_id if client else None
+                preferred_lang = client.preferred_lang if client else new_lang
+                name = client.display_name if client else display_name
 
                 payload = SetLangPayload(
-                    text=f"Language set to {new_lang}",
-                    lang=new_lang,
+                    text=f"Language set to {preferred_lang}",
+                    lang=preferred_lang,
                     client_id=client_id,
+                    display_name=name,
                     time=str(asyncio.get_event_loop().time()),
                 )
                 await websocket.send_text(
@@ -134,7 +139,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
 
             else:
-                # HELLO, ERROR, HEARTBEAT are server-side only; ignore here.
+                # HELLO, ERROR, HEARTBEAT from clients not supported
                 error = ErrorPayload(
                     text=f"Unsupported WebSocket type from client: {raw_type}",
                     time=str(asyncio.get_event_loop().time()),
@@ -152,8 +157,6 @@ async def websocket_endpoint(websocket: WebSocket):
 async def send_heartbeat():
     """
     Periodically sends a heartbeat message to all clients over WebSocket.
-
-    No HTTP endpoints are used at all. This is purely WS.
     """
     while True:
         try:
