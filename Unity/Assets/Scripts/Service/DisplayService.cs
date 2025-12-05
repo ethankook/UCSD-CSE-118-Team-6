@@ -6,9 +6,6 @@ public class DisplayService : MonoBehaviour
 {
     static DisplayService instance;
 
-    private int sentenceIndex = 0;
-
-
     [SerializeField] private TextBoxUI textBox;
     void Awake()
     {

@@ -21,21 +21,8 @@ public class AppController : MonoBehaviour
     [Header("UI")]
     public TextMeshProUGUI statusText;
 
-    // Input mapping (adjust for your specific input system, e.g., OVRInput)
-    private bool isRecording = false;
-
     void Start()
     {
-        SocketService.SendRequest(SocketService.Method.GET, ConfigService.SERVER_URL, null, null, (response) => 
-        {
-            if(response.isSuccess)
-            {
-                LogService.Log($"Server Response: {response.data}");
-            } else 
-            {
-                LogService.Log($"Server Error: {response.error}");
-            }
-        });
         SocketService.ConnectSocket($"ws://{ConfigService.SERVER_URL}/ws");
         // For debugging without mic input, simulate text stream
         StartCoroutine(SimulateTextStream());

@@ -48,6 +48,16 @@ public class ConfigService : MonoBehaviour
     [field: SerializeField]
     public static string Preferred_Language_Code { get; private set; }
 
+    [field: SerializeField]
+    public static string Source_id { get; private set; } 
+
+
+
+    [SerializeField]
+    private string displayName = "Meta QUESTER";
+
+    public static string DISPLAY_NAME { get; private set; }
+
     void Awake()
     {
         SERVER_URL = serverUrl;
@@ -65,6 +75,8 @@ public class ConfigService : MonoBehaviour
         CHAT_ICON = chatIcon;
         DEFAULT_ICON = defaultIcon;
 
+        DISPLAY_NAME = displayName;
+
         SetPreferredLanguage(LanguageCode.English);
     }
 
@@ -72,5 +84,23 @@ public class ConfigService : MonoBehaviour
     public static void SetPreferredLanguage(LanguageCode lang)
     {
         Preferred_Language_Code = LanguageCodeExtensions.ToLanguageString(lang);
+        SocketService.SendSocketMessage(new SocketSetLangMessage());
+    }
+
+    public static void SetSourceId(string sourceId)
+    {
+        Source_id = sourceId;
+    }
+
+    [ContextMenu("Print Config")]
+    public void PrintConfig()
+    {
+        LogService.Log($"Preferred Language Code: {Preferred_Language_Code}\nDisplay Name: {DISPLAY_NAME}\nsource_id: {Source_id}");
+    }
+
+    [ContextMenu("Debug Set Language to English")]
+    private void DebugSetLanguage()
+    {
+        SetPreferredLanguage(LanguageCode.Italian);
     }
 }

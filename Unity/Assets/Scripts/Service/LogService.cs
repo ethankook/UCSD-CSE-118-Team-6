@@ -78,7 +78,7 @@ public class LogService : MonoBehaviour
     {
         if (instance.enableLoggingInConsole)
         {
-            Debug.LogError(message);
+            Debug.LogError(message); 
         }
         if (instance.enableLoggingOnUI && instance.logTextBox != null)
         {

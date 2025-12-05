@@ -8,7 +8,8 @@ using System.Net.WebSockets; // Standard .NET Socket
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
-using System.Net.Sockets; // Thread-safe queue
+using System.Net.Sockets;
+using System.IO; // Thread-safe queue
 
 // Wrapper for REST responses
 [Serializable]
@@ -49,6 +50,8 @@ public class SocketService : MonoBehaviour
     {
         // EXECUTE QUEUED ACTIONS ON MAIN THREAD
         // This replaces "DispatchMessageQueue" and prevents Quest crashes
+        if (websocket == null || websocket.State != WebSocketState.Open)
+            return;
         while (_executionQueue.TryDequeue(out Action action))
         {
             action.Invoke();
@@ -59,7 +62,6 @@ public class SocketService : MonoBehaviour
     {
         instance.StartCoroutine(instance.RequestRoutine(method, url, queryParams, bodyJson, callback));
     }
-
     private IEnumerator RequestRoutine(Method method, string url, Dictionary<string, string> queryParams, string bodyJson, Action<NetworkResponse> callback)
     {
         if (queryParams != null && queryParams.Count > 0)
@@ -118,25 +120,6 @@ public class SocketService : MonoBehaviour
             await websocket.ConnectAsync(new Uri(url), cancellationTokenSource.Token);
             LogService.Log("Socket Connected!");
 
-            // set the language after connecting
-            var setLangMessage = new SocketSetLangMessage(ConfigService.Preferred_Language_Code);
-            string langJson = JsonUtility.ToJson(setLangMessage);
-            byte[] langBytes = Encoding.UTF8.GetBytes(langJson);
-            try 
-            {
-                await websocket.SendAsync(
-                    new ArraySegment<byte>(langBytes), 
-                    WebSocketMessageType.Text, 
-                    true, 
-                    cancellationTokenSource.Token
-                );
-                LogService.Log($"Sent Preferred Language: {ConfigService.Preferred_Language_Code}");
-            }
-            catch (Exception e)
-            {
-                LogService.LogError($"Send Language Error: {e.Message}");
-            }
-
             // Start listening in background
             _ = ReceiveLoop(); 
         }
@@ -184,20 +167,41 @@ public class SocketService : MonoBehaviour
     {
         try 
         {
-            SocketMessage data = SocketMessage.FromJson(jsonMessage);
+            // First, parse to determine the message type
+            var tempData = JsonUtility.FromJson<SocketMessageBase>(jsonMessage);
 
-            if (data.type == SocketMessageType.heartbeat)
+            if (tempData.type == SocketMessageType.heartbeat.ToString())
             {
-                // Optional: Log heartbeat
+                var data = JsonUtility.FromJson<SocketHeartBeatMessage>(jsonMessage);
                 LogService.Log(data.display_text);
             }
-            else if (data.type == SocketMessageType.chat)
+            else if (tempData.type == SocketMessageType.chat.ToString())
             {
+                var data = JsonUtility.FromJson<SocketChatMessage>(jsonMessage);
                 DisplayService.AddTextEntry(data.display_text);
+            }
+            else if (tempData.type == SocketMessageType.hello.ToString())
+            {
+                var data = JsonUtility.FromJson<SocketHelloMessage>(jsonMessage);
+                ConfigService.SetSourceId(data.client_id);
+                LogService.Log($"Received Hello from Server. Assigned Source ID: {data.client_id}");
+            }
+            else if (tempData.type == SocketMessageType.set_lang.ToString())
+            {
+                // the set lang is called from this device to server, so ignore it 
+            }
+            else if (tempData.type == SocketMessageType.headset_to_pi.ToString())
+            {
+                // ignore
+            }
+            else if (tempData.type == SocketMessageType.error.ToString())
+            {
+                var data = JsonUtility.FromJson<SocketErrorMessage>(jsonMessage);
+                LogService.LogError($"Socket Error from Server: {data.text}");
             }
             else
             {
-                LogService.LogError($"Unknown message type: {data}");
+                LogService.LogError($"Unknown message type: {tempData.type}");
             }
         }
         catch (Exception e)
@@ -206,23 +210,16 @@ public class SocketService : MonoBehaviour
         }
     }
 
-    public static async void EmitSocketEvent(string type, string text)
+    public static void SendSocketMessage(SocketMessageBase payload)
+    {
+        instance._executionQueue.Enqueue(() => EmitSocketEvent(payload));
+    }
+    private static async void EmitSocketEvent(SocketMessageBase payload)
     {
         if (instance.websocket != null && instance.websocket.State == WebSocketState.Open)
         {
-            var payload = new SocketMessage
-            (
-                type: SocketMessageType.chat,
-                sourceId: "client",
-                targetId: "server",
-                sourceLang: "en",
-                targetLang: "es",
-                originalText: text,
-                translatedText: "",
-                displayText: text,
-                time: Time.time
-            );
-            string json = payload.ToJson();
+            string json = JsonUtility.ToJson(payload);
+            LogService.Log($"JSON Payload: {json}");
             byte[] bytes = Encoding.UTF8.GetBytes(json);
 
             try 
@@ -241,7 +238,7 @@ public class SocketService : MonoBehaviour
         }
         else
         {
-            LogService.LogError("Cannot emit: Socket not connected.");
+            LogService.LogError("Cannot emit: Socket not connected. Payload: " + JsonUtility.ToJson(payload));
         }
     }
 

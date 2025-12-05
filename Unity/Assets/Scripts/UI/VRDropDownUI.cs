@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Oculus.Interaction.Samples;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class VRDropDownUI : MonoBehaviour
 {
-[Header("Meta Integration")]
+    [Header("Meta Integration")]
     // Drag the object containing the List items here (The one that toggles on/off)
     [SerializeField] private GameObject listContainerObject; 
     
@@ -17,20 +18,22 @@ public class VRDropDownUI : MonoBehaviour
     [SerializeField] private GameObject itemPrefab; // Your button prefab
     [SerializeField] private Transform contentParent; // The parent for the list items
 
+    [SerializeField] private ToggleGroup toggleGroup; // The ToggleGroup for the items
     // Event for your other scripts to listen to
     public event Action<string> OnSelectionChanged;
 
-    private void Start()
-    {
-        // Example usage: Initialize with some default data
-        // Populate(new List<string> { "Option A", "Option B", "Option C" });
-    }
-
     public void Populate(List<string> options)
     {
-        // 1. Clear old items
-        foreach (Transform child in contentParent)
-            Destroy(child.gameObject);
+        if (!toggleGroup)
+        {
+            toggleGroup = gameObject.AddComponent<ToggleGroup>();
+        }
+        // 1. Clear old items, skip the first one (gradient background)
+        for(int i = contentParent.childCount - 1; i >= 1; i--)
+        {
+            Destroy(contentParent.GetChild(i).gameObject);
+        }
+
 
         // 2. Create new items
         foreach (string optionText in options)
@@ -53,6 +56,7 @@ public class VRDropDownUI : MonoBehaviour
         if (btn)
         {
             btn.onValueChanged.AddListener((isOn) => { if (isOn) OnItemClicked(text); });
+            // btn.group = toggleGroup;
         }
     }
 

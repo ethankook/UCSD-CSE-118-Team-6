@@ -34,10 +34,6 @@ public class MicService : MonoBehaviour
     {
         if (instance == null) instance = this;
         else Destroy(gameObject);
-
-        // Ensure model is initialized if not done in Inspector
-        if(!whisperManager.IsLoaded) 
-            whisperManager.InitModel(); 
         
         // Optional: Auto-hook button
         if (RecordingButton != null)
@@ -57,7 +53,7 @@ public class MicService : MonoBehaviour
         else
             LogService.Log("MicService: No microphone found!");
 
-        if (!whisperManager.IsLoaded)
+        if (!whisperManager.IsLoaded && !whisperManager.IsLoading)
         {
             LogService.Log("MicService: Initializing Whisper Model...");
             await whisperManager.InitModel();
@@ -134,6 +130,9 @@ public class MicService : MonoBehaviour
         // 5. Reset UI to Idle
         isProcessing = false;
         UpdateUIState(false, false);
+
+        // send to socket service
+        SocketService.SendSocketMessage(new SocketHeadsetToPiMessage(resultText));
     }
 
     public async Task<string> TranscribeAudio(AudioClip clip)
@@ -190,5 +189,11 @@ public class MicService : MonoBehaviour
         trimmed.SetData(samples, 0);
 
         return trimmed;
+    }
+
+    [ContextMenu("Test Send transcription")]
+    public void TestSendTranscription()
+    {
+        SocketService.SendSocketMessage(new SocketHeadsetToPiMessage("Questa è una trascrizione di prova di MicService."));
     }
 }

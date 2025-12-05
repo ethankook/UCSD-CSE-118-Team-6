@@ -7,12 +7,19 @@ public enum SocketMessageType
     heartbeat,
     error,
     set_lang,
+    hello,
+    headset_to_pi,
+}
+[Serializable]
+public class SocketMessageBase
+{
+    public string type;
+    public float time;
 }
 
 [Serializable]
-public struct SocketMessage
+public class SocketChatMessage : SocketMessageBase
 {
-    public SocketMessageType type;
     public string source_id;
     public string target_id;
     public string source_lang;
@@ -20,41 +27,66 @@ public struct SocketMessage
     public string original_text;
     public string translated_text;
     public string display_text;
-    public float time;
-
-    public SocketMessage(SocketMessageType type, string sourceId, string targetId, string sourceLang, string targetLang, string originalText, string translatedText, string displayText, float time)
+    public SocketChatMessage(string originalText)
     {
-        this.type = type;
-        source_id = sourceId;
-        target_id = targetId;
-        source_lang = sourceLang;
-        target_lang = targetLang;
+        this.type = SocketMessageType.chat.ToString();
+        source_id = ConfigService.Source_id;
+        target_id = null;
+        source_lang = ConfigService.Preferred_Language_Code;
+        target_lang = null;
         original_text = originalText;
-        translated_text = translatedText;
-        display_text = displayText;
-        this.time = time;
+        translated_text = null;
+        display_text = null;
+        time = 0f;
     }
-
-    public string ToJson()
-    {
-        return JsonUtility.ToJson(this);
-    }
-
-    public static SocketMessage FromJson(string json)
-    {
-        return JsonUtility.FromJson<SocketMessage>(json);
-    }
-
 }
 
-public struct SocketSetLangMessage
+public class SocketSetLangMessage : SocketMessageBase
 {
-    public string type;
     public string lang;
+    public string display_name;
 
-    public SocketSetLangMessage(string lang)
+    public SocketSetLangMessage()
     {
         type = SocketMessageType.set_lang.ToString();
-        this.lang = lang;
+        lang = ConfigService.Preferred_Language_Code;
+        display_name = ConfigService.DISPLAY_NAME;
+    }
+}
+
+public class SocketHelloMessage : SocketMessageBase
+{
+    public string client_id;
+
+    public SocketHelloMessage(string clientId)
+    {
+        type = SocketMessageType.hello.ToString();
+        client_id = clientId;
+    }
+}
+
+public class SocketHeartBeatMessage : SocketMessageBase
+{
+    public string display_text;
+}
+
+public class SocketHeadsetToPiMessage : SocketMessageBase
+{
+    public string text;
+    public SocketHeadsetToPiMessage(string text)
+    {
+        this.type = SocketMessageType.headset_to_pi.ToString();
+        this.text = text;
+        time = 0f;
+    }
+}
+public class SocketErrorMessage : SocketMessageBase
+{
+    public string text;
+    public SocketErrorMessage(string errorMessage)
+    {
+        this.type = SocketMessageType.error.ToString();
+        this.text = errorMessage;
+        time = 0f;
     }
 }

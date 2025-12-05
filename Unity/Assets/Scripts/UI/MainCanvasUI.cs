@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Oculus.Interaction.Samples;
 using TMPro;
 using UnityEngine;
@@ -30,7 +32,7 @@ public class MainCanvasUI : MonoBehaviour
     [SerializeField] private Vector3 offsetFromCamera = new Vector3(0, 0.7f, 0.2f);
     [SerializeField] private Button toggleFollowButton;
     [SerializeField] private TextMeshProUGUI statusText;
-    [SerializeField] private DropDownGroup preferredLanguageDropdown;
+    [SerializeField] private VRDropDownUI preferredLanguageDropdown;
 
     void Start()
     {
@@ -40,7 +42,8 @@ public class MainCanvasUI : MonoBehaviour
         }
         if (preferredLanguageDropdown != null)
         {
-            preferredLanguageDropdown.WhenSelectionChanged.AddListener(OnPreferredLanguageChanged);
+            preferredLanguageDropdown.OnSelectionChanged += OnPreferredLanguageChanged;
+            preferredLanguageDropdown.Populate(Enum.GetNames(typeof(LanguageCode)).ToList());
         }
     }
     [ContextMenu("Toggle Follow Camera")]
@@ -49,7 +52,15 @@ public class MainCanvasUI : MonoBehaviour
         FollowCamera = !FollowCamera;
     }
     [ContextMenu("Update Preferred Language")]
-    private void OnPreferredLanguageChanged(int index)
+    private void OnPreferredLanguageChanged(string selectedText)
     {
+        if (Enum.TryParse<LanguageCode>(selectedText, out var languageCode))
+        {
+            ConfigService.SetPreferredLanguage(languageCode);
+        }
+        else
+        {
+            LogService.LogError($"Invalid language selection: {selectedText}");
+        }
     }
 }
