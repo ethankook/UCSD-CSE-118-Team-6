@@ -14,6 +14,8 @@ class MessageType(str, Enum):
     PERSONAL_CHAT = "personal_chat"
     ERROR = "error"
     HEARTBEAT = "heartbeat"
+    HEADSET_TO_PI = "headset_to_pi"
+    HEADSET_AUDIO = "headset_audio"  # NEW: headset sends WAV audio for ASR
 
 
 class DisplayRole(str, Enum):
@@ -30,7 +32,8 @@ class ChatPayload(BaseModel):
 
     Used for:
       - type=CHAT (broadcast)
-      - type=PERSONAL_CHAT (1-to-1)
+      - type=PERSONAL_CHAT (1-to-1 between two clients)
+      - type=HEADSET_TO_PI (1-to-1 headset -> Pi)
 
     Includes:
       - IDs + display names
@@ -38,7 +41,7 @@ class ChatPayload(BaseModel):
       - original + translated text
       - display_text for convenient rendering
     """
-    type: MessageType  # CHAT or PERSONAL_CHAT
+    type: MessageType  # CHAT, PERSONAL_CHAT, HEADSET_TO_PI, etc.
 
     source_id: Optional[str] = None
     target_id: Optional[str] = None
@@ -81,7 +84,7 @@ class SetLangPayload(BaseModel):
     """
     type: MessageType = MessageType.SET_LANG
     text: str                 # human-readable message ("Language set to en")
-    lang: str                 # new preferred language (app-level code, e.g. "en")
+    lang: str                 # new preferred language (app-level code, e.g., "en")
     client_id: Optional[str] = None
     display_name: Optional[str] = None
     time: str

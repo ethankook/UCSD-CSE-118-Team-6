@@ -49,6 +49,17 @@ async def websocket_endpoint(websocket: WebSocket):
 
       3) personal_chat (1-to-1 chat with translation)
          { "type": "personal_chat", "to_client_id": "<uuid>", "text": "Hi!" }
+
+      4) headset_to_pi (text -> translated text to Pi)
+         { "type": "headset_to_pi", "text": "Hi Pi" }
+
+      5) headset_audio (audio -> ASR -> translated text to Pi)
+         {
+           "type": "headset_audio",
+           "audio_b64": "<base64 WAV>",
+           "sample_rate": 16000,
+           "lang": "en"
+         }
     """
     role = websocket.query_params.get("role")
     is_pi = role == "pi"
@@ -138,8 +149,48 @@ async def websocket_endpoint(websocket: WebSocket):
                     text=text,
                 )
 
+            elif msg_type == MessageType.HEADSET_TO_PI:
+                # Headset sends plain text to Pi (no ASR)
+                text = data.get("text", "")
+                if not text:
+                    error = ErrorPayload(
+                        text="Missing 'text' for headset_to_pi",
+                        time=str(asyncio.get_event_loop().time()),
+                    )
+                    await websocket.send_text(
+                        json.dumps(error.model_dump(), ensure_ascii=False)
+                    )
+                    continue
+
+                await manager.send_message_to_pi_from_ws(websocket, text)
+
+            elif msg_type == MessageType.HEADSET_AUDIO:
+                # Headset sends audio (WAV -> base64) for backend ASR -> Pi
+                audio_b64 = data.get("audio_b64")
+                sample_rate = data.get("sample_rate", 16000)
+
+                if not audio_b64:
+                    error = ErrorPayload(
+                        text="Missing 'audio_b64' for headset_audio",
+                        time=str(asyncio.get_event_loop().time()),
+                    )
+                    await websocket.send_text(
+                        json.dumps(error.model_dump(), ensure_ascii=False)
+                    )
+                    continue
+
+                # Optional language hint from headset ("en", "es-419", etc.)
+                language_hint = data.get("lang")
+
+                await manager.handle_headset_audio_from_ws(
+                    websocket=websocket,
+                    audio_b64=audio_b64,
+                    sample_rate=int(sample_rate),
+                    language_hint=language_hint,
+                )
+
             else:
-                # HELLO, ERROR, HEARTBEAT from clients not supported
+                # HELLO, ERROR, HEARTBEAT from clients not supported from client side
                 error = ErrorPayload(
                     text=f"Unsupported WebSocket type from client: {raw_type}",
                     time=str(asyncio.get_event_loop().time()),
@@ -152,7 +203,7 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 
-# HEARTBEAT TASK 
+# HEARTBEAT TASK
 
 async def send_heartbeat():
     """
@@ -171,13 +222,4 @@ async def send_heartbeat():
                 )
         except Exception as e:
             print(f"[HEARTBEAT ERROR] {e}")
-            await asyncio.sleep(5)
-
-
-# @app.on_event("startup")
-# async def startup_event():
-#     asyncio.create_task(send_heartbeat())
-
-
-if __name__ == "__main__":
-    uvicorn.run(app="main:app", host="0.0.0.0", port=8000, reload=True)
+            awa

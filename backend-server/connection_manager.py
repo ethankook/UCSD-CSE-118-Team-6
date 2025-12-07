@@ -14,6 +14,7 @@ from models import (
     HelloPayload,
     MessageType,
 )
+from asr_service import AsrService  # NEW
 
 
 class ClientConnection:
@@ -51,6 +52,7 @@ class ConnectionManager:
       - Perform translations via DeepL
       - Broadcast group chat with translation
       - Send personal 1-to-1 messages with translation
+      - Perform ASR for headset audio and forward transcripts to Pi
     """
 
     def __init__(self):
@@ -178,6 +180,10 @@ class ConnectionManager:
             "vi": "VI",
         }
 
+        # ASR service using Whisper (local)
+        self.asr_service = AsrService(model_name="tiny")
+        print("[ASR] Backend ASR service initialized")
+
     # Helper: lookup
 
     def get_client_by_ws(self, websocket: WebSocket) -> Optional[ClientConnection]:
@@ -214,7 +220,19 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket, is_pi: bool = False):
         """
         Accept a new WebSocket and register a client.
+
+        Rules:
+          - If is_pi=True and a Pi is already connected, reject the new Pi.
+          - Otherwise, register the client normally.
         """
+        # If a second Pi tries to connect, reject it
+        if is_pi and self.pi_client_id is not None:
+            print("[PI] Second Pi attempted to connect; rejecting new connection")
+            # We must accept before we can close
+            await websocket.accept()
+            await websocket.close(code=4000, reason="Pi already connected")
+            return
+
         await websocket.accept()
 
         client = ClientConnection(websocket=websocket, preferred_lang="en")
@@ -283,7 +301,6 @@ class ConnectionManager:
         langs_to_delete: List[str] = []
         for lang, group in self.lang_groups.items():
             if client in group:
-                client_in_group = True
                 group.remove(client)
                 if not group:
                     langs_to_delete.append(lang)
@@ -312,7 +329,7 @@ class ConnectionManager:
             self.add_to_lang_group(client, new_lang_norm)
             print(f"[LANG] client_id={client.client_id} language updated to {new_lang_norm}")
 
-        if display_name:
+        if display_name and display_name != client.display_name:
             client.display_name = display_name
             print(f"[NAME] client_id={client.client_id} display_name updated to '{display_name}'")
 
@@ -391,11 +408,13 @@ class ConnectionManager:
         target_client_id: str,
         source_lang: Optional[str] = None,
         target_lang: Optional[str] = None,
+        message_type: MessageType = MessageType.PERSONAL_CHAT,
     ):
         """
         Low-level function to actually send the ChatPayloads to sender + receiver.
 
         It does NOT perform translation. It just uses the translated_text you pass in.
+        message_type controls the payload.type (PERSONAL_CHAT vs HEADSET_TO_PI, etc.).
         """
         time_str = str(asyncio.get_event_loop().time())
         target = self.get_client_by_id(target_client_id)
@@ -415,7 +434,7 @@ class ConnectionManager:
                 text=translated_text,
             )
             payload_target = ChatPayload(
-                type=MessageType.PERSONAL_CHAT,
+                type=message_type,
                 source_id=source_client_id,
                 target_id=target_client_id,
                 source_lang=source_lang,
@@ -445,7 +464,7 @@ class ConnectionManager:
                 text=translated_text,
             )
             payload_source = ChatPayload(
-                type=MessageType.PERSONAL_CHAT,
+                type=message_type,
                 source_id=source_client_id,
                 target_id=target_client_id,
                 source_lang=source_lang,
@@ -502,6 +521,115 @@ class ConnectionManager:
             target_client_id=target_client_id,
             source_lang=source_lang,
             target_lang=target_lang,
+            message_type=MessageType.PERSONAL_CHAT,
+        )
+
+    # 1-to-1 messaging from a WebSocket to the Pi (does the translation)
+
+    async def send_message_to_pi_from_ws(
+        self,
+        websocket: WebSocket,
+        text: str,
+    ):
+        """
+        High-level function for headset -> Pi messages.
+
+        Flow:
+          1) Source = client bound to this websocket (headset)
+          2) Target = current Pi (self.pi_client_id)
+          3) Translate text from source_lang -> pi_lang
+          4) Send HEADSET_TO_PI payload to Pi + echo back to source
+        """
+        # 0) Ensure we actually have a Pi to send to
+        if not self.pi_client_id:
+            print("[PI] No Pi connected; dropping message to Pi")
+            return
+
+        # 1) Find the source client from the websocket
+        source_client = self.get_client_by_ws(websocket)
+        if not source_client:
+            print("[WARN] send_message_to_pi_from_ws: no source client")
+            return
+
+        source_id = source_client.client_id
+        source_lang = source_client.preferred_lang
+
+        # 2) Lookup the Pi client using pi_client_id
+        pi_client = self.get_client_by_id(self.pi_client_id)
+        if not pi_client:
+            print("[PI] pi_client_id set but client not found; dropping message")
+            return
+
+        target_client_id = pi_client.client_id
+        target_lang = pi_client.preferred_lang
+
+        # 3) Translate text source_lang -> target_lang (DeepL)
+        translated_text = await asyncio.to_thread(
+            self.translate_text,
+            text,
+            target_lang,
+            source_lang,
+        )
+
+        # 4) Reuse the generic 1-to-1 sender, but with HEADSET_TO_PI type
+        await self.send_personal_message_by_id(
+            original_text=text,
+            translated_text=translated_text,
+            source_client_id=source_id,
+            target_client_id=target_client_id,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            message_type=MessageType.HEADSET_TO_PI,
+        )
+
+    # Headset audio -> ASR -> text -> Pi
+
+    async def handle_headset_audio_from_ws(
+        self,
+        websocket: WebSocket,
+        audio_b64: str,
+        sample_rate: int = 16000,
+        language_hint: Optional[str] = None,
+    ):
+        """
+        Headset -> backend audio for ASR, then forward as text to Pi.
+
+        Flow:
+          1) Ensure Pi is connected.
+          2) Resolve source client (headset) from this websocket.
+          3) Run Whisper ASR in a background thread.
+          4) Reuse send_message_to_pi_from_ws(...) with the recognized text.
+        """
+        # 0) Ensure Pi exists
+        if not self.pi_client_id:
+            print("[ASR] No Pi connected; dropping headset_audio")
+            return
+
+        # 1) Resolve source client
+        source_client = self.get_client_by_ws(websocket)
+        if not source_client:
+            print("[ASR] handle_headset_audio_from_ws: no source client")
+            return
+
+        # 2) Run ASR off the event loop (CPU-heavy)
+        recognized_text = await asyncio.to_thread(
+            self.asr_service.transcribe_b64_wav,
+            audio_b64,
+            sample_rate,
+            language_hint or source_client.preferred_lang,
+        )
+
+        recognized_text = (recognized_text or "").strip()
+        if not recognized_text:
+            print("[ASR] Empty transcript from ASR; nothing to send to Pi")
+            return
+
+        print(f"[ASR] Headset transcript: {recognized_text!r}")
+
+        # 3) Reuse existing headset->Pi text pipeline
+        await self.send_message_to_pi_from_ws(
+            websocket=websocket,
+            text=recognized_text,
         )
 
     # Broadcast chat (WebSocket -> all other clients, with translation)
