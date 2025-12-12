@@ -67,8 +67,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 123
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 0dd029f7ed7c9854393ec17ec809fdb6, type: 2}
-  m_sharedMaterial: {fileID: -5349213402570647541, guid: 0dd029f7ed7c9854393ec17ec809fdb6, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: aef843dd5c4fae04f890112257ddd836, type: 2}
+  m_sharedMaterial: {fileID: -1061902004505224120, guid: aef843dd5c4fae04f890112257ddd836, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -658,8 +658,8 @@ GameObject:
   - component: {fileID: 5772325927888250595}
   - component: {fileID: 2054229433589691467}
   - component: {fileID: 4002879532132254933}
-  - component: {fileID: 7157543275230323234}
   - component: {fileID: 2263348347616764416}
+  - component: {fileID: 1445455657263880975}
   m_Layer: 0
   m_Name: new text Entry
   m_TagString: QDSUIToggleBorderlessButton
@@ -757,7 +757,23 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &7157543275230323234
+--- !u!114 &2263348347616764416
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7497338983301615634}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 984ebf57e6205ea40b4502e7e45d7795, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TextEntryUI
+  textContent: 123
+  textBox: {fileID: 9025874211105477359}
+  iconImage: {fileID: 8133336974416694247}
+  messageBackground: {fileID: 5617486365431304184}
+--- !u!114 &1445455657263880975
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -768,7 +784,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ec472db9c42ccc342a2d35777d25c03d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Oculus.Interaction.Samples::Oculus.Interaction.Samples.AnimatorOverrideLayerWeigth
   _animator: {fileID: 4002879532132254933}
   _overrideLayer: Selected Layer
   _transitionDuration: 0.2
@@ -797,22 +813,6 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   _toggle: {fileID: 2054229433589691467}
---- !u!114 &2263348347616764416
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7497338983301615634}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 984ebf57e6205ea40b4502e7e45d7795, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::TextEntryUI
-  textContent: 123
-  textBox: {fileID: 9025874211105477359}
-  iconImage: {fileID: 8133336974416694247}
-  messageBackground: {fileID: 5617486365431304184}
 --- !u!1 &7507179325546119747
 GameObject:
   m_ObjectHideFlags: 0

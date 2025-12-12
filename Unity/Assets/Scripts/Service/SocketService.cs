@@ -219,7 +219,6 @@ public class SocketService : MonoBehaviour
         if (instance.websocket != null && instance.websocket.State == WebSocketState.Open)
         {
             string json = JsonUtility.ToJson(payload);
-            LogService.Log($"JSON Payload: {json}");
             byte[] bytes = Encoding.UTF8.GetBytes(json);
 
             try 

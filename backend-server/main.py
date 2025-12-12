@@ -222,4 +222,3 @@ async def send_heartbeat():
                 )
         except Exception as e:
             print(f"[HEARTBEAT ERROR] {e}")
-            awa

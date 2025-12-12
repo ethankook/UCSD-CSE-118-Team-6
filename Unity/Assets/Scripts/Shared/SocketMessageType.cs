@@ -9,6 +9,7 @@ public enum SocketMessageType
     set_lang,
     hello,
     headset_to_pi,
+    headset_audio
 }
 [Serializable]
 public class SocketMessageBase
@@ -87,6 +88,21 @@ public class SocketErrorMessage : SocketMessageBase
     {
         this.type = SocketMessageType.error.ToString();
         this.text = errorMessage;
+        time = 0f;
+    }
+}
+
+public class SocketHeadsetAudioMessage: SocketMessageBase
+{
+    public string audio_b64;
+    public int sample_rate;
+    public string lang;
+    public SocketHeadsetAudioMessage(string audioDataBase64)
+    {
+        this.type = SocketMessageType.headset_audio.ToString();
+        this.audio_b64 = audioDataBase64;
+        this.sample_rate = ConfigService.MIC_SAMPLING_RATE;
+        this.lang = ConfigService.Preferred_Language_Code;
         time = 0f;
     }
 }

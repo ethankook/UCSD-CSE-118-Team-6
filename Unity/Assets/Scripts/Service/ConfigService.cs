@@ -58,6 +58,11 @@ public class ConfigService : MonoBehaviour
 
     public static string DISPLAY_NAME { get; private set; }
 
+    [SerializeField]
+    private int micSamplingRate = 16000;
+
+    public static int MIC_SAMPLING_RATE { get; private set; }
+
     void Awake()
     {
         SERVER_URL = serverUrl;
@@ -76,6 +81,7 @@ public class ConfigService : MonoBehaviour
         DEFAULT_ICON = defaultIcon;
 
         DISPLAY_NAME = displayName;
+        MIC_SAMPLING_RATE = micSamplingRate;
 
         SetPreferredLanguage(LanguageCode.English);
     }

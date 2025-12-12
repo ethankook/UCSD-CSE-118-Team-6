@@ -2657,7 +2657,7 @@ MonoBehaviour:
     m_Right: 0
     m_Top: 0
     m_Bottom: 0
-  m_ChildAlignment: 0
+  m_ChildAlignment: 6
   m_Spacing: 0
   m_ChildForceExpandWidth: 0
   m_ChildForceExpandHeight: 1
@@ -2716,8 +2716,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ce3c11bbd527168498112433bdcf3919, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRDropDownUI
-  listContainerObject: {fileID: 1217855186639325763}
   mainLabel: {fileID: 1285203536388801251}
+  dropdownListButtonToggle: {fileID: 7825541481275938441}
   itemPrefab: {fileID: 6518279934821108346, guid: 04d7ba772fa4990438a9cae0c27c5144, type: 3}
   contentParent: {fileID: 2579850041088064793}
   toggleGroup: {fileID: 8750719122921576018}
@@ -9533,7 +9533,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MicService
   whisperManager: {fileID: 1541662033}
   maxRecordingLength: 20
-  sampleRate: 16000
   RecordingButton: {fileID: 6869810457565894646}
   RecordingButtonText: {fileID: 595206484591177084}
   RecordingButtonBackground: {fileID: 6969549370676845992}
@@ -9652,7 +9651,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6298dbf8385f1764cbc2d85c8357f74d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConfigService
-  serverUrl: 192.168.0.147:8000
+  serverUrl: 192.168.0.110:8000
   colorPrimary: {r: 1, g: 1, b: 1, a: 1}
   colorSecondary: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   colorText: {r: 0, g: 0, b: 0, a: 1}
@@ -9665,7 +9664,8 @@ MonoBehaviour:
   assertionIcon: {fileID: -1347210285878915494, guid: 4f3b4a4ae58ad484e9fc92ab68a8ffef, type: 3}
   chatIcon: {fileID: 1479672638205615629, guid: 4f3b4a4ae58ad484e9fc92ab68a8ffef, type: 3}
   defaultIcon: {fileID: -7995430723337085849, guid: 4f3b4a4ae58ad484e9fc92ab68a8ffef, type: 3}
-  displayName: Meta QUESTER
+  displayName: quest 2
+  micSamplingRate: 16000
 --- !u!1 &1542483479
 GameObject:
   m_ObjectHideFlags: 0
@@ -12366,37 +12366,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 366883343}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1968644198
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1968644199}
-  m_Layer: 0
-  m_Name: icon_info_24_Outline
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 0
---- !u!4 &1968644199
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1968644198}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1970799780
 GameObject:
   m_ObjectHideFlags: 0
@@ -13803,10 +13772,9 @@ GameObject:
   - component: {fileID: 2106326290125140582}
   - component: {fileID: 8583842742985419570}
   - component: {fileID: 8750719122921576018}
-  - component: {fileID: 9220748201034008064}
   - component: {fileID: 3346051627223587077}
-  - component: {fileID: 1658896399964182935}
-  - component: {fileID: 4393957203407805725}
+  - component: {fileID: 8750719122921576019}
+  - component: {fileID: 8750719122921576020}
   m_Layer: 0
   m_Name: DropDownList
   m_TagString: QDSUITooltip
@@ -13968,23 +13936,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8494344328195341451}
   m_CullTransparentMesh: 1
---- !u!114 &1658896399964182935
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1217855186639325763}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dc42784cf147c0c48a680349fa168899, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_IgnoreReversedGraphics: 1
-  m_BlockingObjects: 0
-  m_BlockingMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
 --- !u!114 &1768087314328453927
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14340,7 +14291,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1217855186639325763}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -1}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -14349,8 +14300,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 200, y: -48}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 250, y: -0}
+  m_SizeDelta: {x: 16, y: 0}
   m_Pivot: {x: 1, y: 1}
 --- !u!224 &2618178219516694710
 RectTransform:
@@ -14485,7 +14436,7 @@ Canvas:
   m_Enabled: 1
   serializedVersion: 3
   m_RenderMode: 2
-  m_Camera: {fileID: 0}
+  m_Camera: {fileID: 240659960}
   m_PlaneDistance: 100
   m_PixelPerfect: 0
   m_ReceivesEvents: 1
@@ -14864,21 +14815,6 @@ RectTransform:
   m_AnchoredPosition: {x: 80, y: -26}
   m_SizeDelta: {x: 80, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &4393957203407805725
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1217855186639325763}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 821e0316d7a5d5a4abd3d9a0032114ce, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  minAlpha: 0.001
-  raycaster: {fileID: 1658896399964182935}
-  group: {fileID: 2956150395949187692}
 --- !u!224 &4450347883563259666
 RectTransform:
   m_ObjectHideFlags: 0
@@ -15867,7 +15803,7 @@ MonoBehaviour:
     m_Right: 0
     m_Top: 0
     m_Bottom: 0
-  m_ChildAlignment: 0
+  m_ChildAlignment: 6
   m_Spacing: 8
   m_ChildForceExpandWidth: 1
   m_ChildForceExpandHeight: 0
@@ -16980,6 +16916,40 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_AllowSwitchOff: 0
+--- !u!114 &8750719122921576019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217855186639325763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7aaf960227867044282d921171d2d7ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Oculus.VR::OVRRaycaster
+  m_IgnoreReversedGraphics: 1
+  m_BlockingObjects: 0
+  m_BlockingMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  pointer: {fileID: 1450554839}
+  sortOrder: 1
+--- !u!114 &8750719122921576020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1217855186639325763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 821e0316d7a5d5a4abd3d9a0032114ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Oculus.Interaction.Samples::Oculus.Interaction.DisableRaycaster
+  minAlpha: 0
+  raycaster: {fileID: 8750719122921576019}
+  group: {fileID: 2956150395949187692}
 --- !u!224 &9067089937650395526
 RectTransform:
   m_ObjectHideFlags: 0
@@ -16999,26 +16969,6 @@ RectTransform:
   m_AnchoredPosition: {x: 5, y: -16}
   m_SizeDelta: {x: 10, y: 16}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &9220748201034008064
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1217855186639325763}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_IgnoreLayout: 1
-  m_MinWidth: -1
-  m_MinHeight: -1
-  m_PreferredWidth: -1
-  m_PreferredHeight: -1
-  m_FlexibleWidth: -1
-  m_FlexibleHeight: -1
-  m_LayoutPriority: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -17030,4 +16980,3 @@ SceneRoots:
   - {fileID: 1476182942}
   - {fileID: 1894916575}
   - {fileID: 1088178935}
-  - {fileID: 1968644199}

@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using Whisper;
 using TMPro;
 using UnityEngine.UI;
+using System.IO;
+using System.Text;
+using System;
 
 public class MicService : MonoBehaviour
 {
@@ -17,7 +20,6 @@ public class MicService : MonoBehaviour
 
     [Header("Settings")]
     public int maxRecordingLength = 20; 
-    public int sampleRate = 16000; 
 
     private AudioClip recordingClip;
     private string micDevice;   
@@ -71,7 +73,59 @@ public class MicService : MonoBehaviour
         if (isRecording && Microphone.IsRecording(micDevice) == false)
         {
             // The clip finished (reached max seconds)
-             _ = StopRecordingAndTranscribe(); // Fire and forget
+             _ = StopRecordingAndSendAudio(); // Fire and forget
+        }
+    }
+
+    private string ConvertToWavBase64(AudioClip clip)
+    {
+        var samples = new float[clip.samples * clip.channels];
+        clip.GetData(samples, 0);
+
+        using (var memoryStream = new MemoryStream())
+        {
+            using (var writer = new BinaryWriter(memoryStream))
+            {
+                int channelCount = clip.channels;
+                int frequency = clip.frequency;
+                int sampleCount = samples.Length;
+                int bitsPerSample = 16; 
+                int bytesPerSample = bitsPerSample / 8;
+                int byteRate = frequency * channelCount * bytesPerSample;
+                int blockAlign = channelCount * bytesPerSample;
+
+                // --- RIFF Header ---
+                writer.Write(Encoding.UTF8.GetBytes("RIFF"));
+                writer.Write(36 + sampleCount * bytesPerSample); // File Size - 8
+                writer.Write(Encoding.UTF8.GetBytes("WAVE"));
+
+                // --- Format Chunk ---
+                writer.Write(Encoding.UTF8.GetBytes("fmt "));
+                writer.Write(16); // Subchunk1Size (16 for PCM)
+                writer.Write((short)1); // AudioFormat (1 for PCM)
+                writer.Write((short)channelCount);
+                writer.Write(frequency);
+                writer.Write(byteRate);
+                writer.Write((short)blockAlign);
+                writer.Write((short)bitsPerSample);
+
+                // --- Data Chunk ---
+                writer.Write(Encoding.UTF8.GetBytes("data"));
+                writer.Write(sampleCount * bytesPerSample); // Subchunk2Size
+
+                // --- Write Data (Convert Float to Int16) ---
+                // Unity audio is 0.0f to 1.0f (mostly). WAV expects Int16.
+                foreach (var sample in samples)
+                {
+                    // Scale float to short range (approx -32768 to 32767)
+                    short intSample = (short)(Mathf.Clamp(sample, -1f, 1f) * 32767f);
+                    writer.Write(intSample);
+                }
+            }
+
+            // Convert the complete byte array to Base64
+            byte[] wavBytes = memoryStream.ToArray();
+            return Convert.ToBase64String(wavBytes);
         }
     }
 
@@ -89,7 +143,7 @@ public class MicService : MonoBehaviour
         else
         {
             // We must use a fire-and-forget async call here for the button void
-            _ = StopRecordingAndTranscribe(); 
+            _ = StopRecordingAndSendAudio(); 
         }
     }
 
@@ -101,7 +155,7 @@ public class MicService : MonoBehaviour
         if (isRecording || isProcessing) return;
 
         // Start Unity Microphone
-        recordingClip = Microphone.Start(micDevice, false, maxRecordingLength, sampleRate);
+        recordingClip = Microphone.Start(micDevice, false, maxRecordingLength, ConfigService.MIC_SAMPLING_RATE);
         isRecording = true;
 
         UpdateUIState(true, false);
@@ -135,6 +189,31 @@ public class MicService : MonoBehaviour
         SocketService.SendSocketMessage(new SocketHeadsetToPiMessage(resultText));
     }
 
+    public async Task StopRecordingAndSendAudio()
+    {
+        if (!isRecording) return;
+
+        // 1. Capture current position
+        int position = Microphone.GetPosition(micDevice);
+        Microphone.End(micDevice);
+        isRecording = false;
+
+        // 2. Update UI to "Thinking" state
+        UpdateUIState(false, true); 
+
+        // 3. Trim the clip
+        AudioClip trimmedClip = TrimSilence(recordingClip, position);
+
+        // 4. Convert to WAV Base64
+        string wavBase64 = ConvertToWavBase64(trimmedClip);
+
+        // 5. Send to Socket Service
+        SocketService.SendSocketMessage(new SocketHeadsetAudioMessage(wavBase64));
+
+        // 6. Reset UI to Idle
+        isProcessing = false;
+        UpdateUIState(false, false);
+    }
     public async Task<string> TranscribeAudio(AudioClip clip)
     {
         if (clip == null || whisperManager == null) return "";

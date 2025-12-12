@@ -8,15 +8,14 @@ using UnityEngine.UI;
 public class VRDropDownUI : MonoBehaviour
 {
     [Header("Meta Integration")]
-    // Drag the object containing the List items here (The one that toggles on/off)
-    [SerializeField] private GameObject listContainerObject; 
     
     // Drag the main label (The one always visible)
     [SerializeField] private TextMeshProUGUI mainLabel;
+    [SerializeField] private Toggle dropdownListButtonToggle;
 
     [Header("Configuration")]
     [SerializeField] private GameObject itemPrefab; // Your button prefab
-    [SerializeField] private Transform contentParent; // The parent for the list items
+    [SerializeField] private RectTransform contentParent; // The parent for the list items, it should contain a group alpha toggle to fade in/out
 
     [SerializeField] private ToggleGroup toggleGroup; // The ToggleGroup for the items
     // Event for your other scripts to listen to
@@ -56,7 +55,7 @@ public class VRDropDownUI : MonoBehaviour
         if (btn)
         {
             btn.onValueChanged.AddListener((isOn) => { if (isOn) OnItemClicked(text); });
-            // btn.group = toggleGroup;
+            btn.group = toggleGroup;
         }
     }
 
@@ -71,9 +70,9 @@ public class VRDropDownUI : MonoBehaviour
         // 3. Close the dropdown
         // Since we have the reference to the list object, we can just close it directly.
         // This works regardless of what the "DropDownGroup" script thinks.
-        if (listContainerObject)
+        if (contentParent)
         {
-            listContainerObject.SetActive(false);
+            dropdownListButtonToggle.isOn = false; // click the toggle group to close it
         }
     }
 }
